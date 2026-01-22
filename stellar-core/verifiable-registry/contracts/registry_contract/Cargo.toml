@@ -1,0 +1,18 @@
+[package]
+name = "registry-contract"
+version = "0.1.0"
+edition = "2021"
+description = "Registry contract for project metadata anchoring"
+license = "Apache-2.0"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+soroban-sdk = { workspace = true }
+
+[dev-dependencies]
+soroban-sdk = { workspace = true, features = ["testutils"] }
+
+[features]
+testutils = ["soroban-sdk/testutils"]
