@@ -186,7 +186,7 @@ func initDatabase(config *Config) (*gorm.DB, error) {
 
 // runMigrations runs automatic migrations for report models
 func runMigrations(db *gorm.DB) error {
-	// Auto-migrate the reports model
+	// Auto-migrate the reports models
 	err := db.AutoMigrate(
 		&reports.ReportDefinition{},
 		&reports.ReportSchedule{},
