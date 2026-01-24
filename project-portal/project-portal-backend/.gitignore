@@ -68,6 +68,5 @@ local.db
 local.sqlite
 *.sqlite3
 
-
 # Build output
 build
