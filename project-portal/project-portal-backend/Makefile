@@ -1,4 +1,8 @@
-.PHONY: build run test clean lint fmt deps docker-build docker-run lambda-build
+.PHONY: build run test clean lint fmt deps docker-build docker-run lambda-build db-up db-down db-logs db-shell test-integration
+
+# Load environment variables from .env file
+-include .env
+export
 
 # Go parameters
 GOCMD=go
@@ -59,11 +63,24 @@ lambda-zip: lambda-build
 	cd $(LAMBDA_DIR) && zip function.zip $(LAMBDA_BINARY)
 
 # Run
-run:
+run: db-up
 	go run cmd/api/main.go
 
 dev:
 	air -c .air.toml
+
+# Database (Postgres)
+db-up:
+	docker-compose up -d db
+
+db-down:
+	docker-compose down
+
+db-logs:
+	docker-compose logs -f db
+
+db-shell:
+	docker-compose exec db psql -U user -d carbonscribe
 
 # Test
 test:
@@ -75,6 +92,9 @@ test-coverage:
 
 test-notifications:
 	$(GOTEST) -v ./internal/notifications/...
+
+test-integration: db-up
+	$(GOTEST) -v -tags integration ./internal/health/...
 
 # Lint and format
 lint:
@@ -165,9 +185,14 @@ help:
 	@echo "  test              - Run tests"
 	@echo "  test-coverage     - Run tests with coverage"
 	@echo "  test-notifications- Run notification module tests"
+	@echo "  test-integration  - Run health integration tests"
 	@echo "  lint              - Run linter"
 	@echo "  fmt               - Format code"
 	@echo "  clean             - Clean build artifacts"
+	@echo "  db-up             - Start Postgres database"
+	@echo "  db-down           - Stop Postgres database"
+	@echo "  db-logs           - View database logs"
+	@echo "  db-shell          - Login to database shell"
 	@echo "  docker-build      - Build Docker image"
 	@echo "  docker-run        - Run Docker container"
 	@echo "  migrate-up        - Run database migrations"

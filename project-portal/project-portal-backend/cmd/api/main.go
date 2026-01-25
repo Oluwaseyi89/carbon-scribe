@@ -12,6 +12,7 @@ import (
 
 	"carbon-scribe/project-portal/project-portal-backend/internal/auth"
 	"carbon-scribe/project-portal/project-portal-backend/internal/collaboration"
+	"carbon-scribe/project-portal/project-portal-backend/internal/health"
 	"carbon-scribe/project-portal/project-portal-backend/internal/integration"
 	"carbon-scribe/project-portal/project-portal-backend/internal/reports"
 
@@ -56,6 +57,10 @@ func main() {
 	collabRepo := collaboration.NewRepository(db)
 	collabService := collaboration.NewService(collabRepo)
 	collabHandler := collaboration.NewHandler(collabService)
+
+	healthRepo := health.NewRepository(db)
+	healthService := health.NewService(healthRepo)
+	healthHandler := health.NewHandler(healthService)
 
 	integrationRepo := integration.NewRepository(db)
 	integrationService := integration.NewService(integrationRepo)
@@ -116,6 +121,9 @@ func main() {
 		// Register reports routes under v1
 		reportsHandler.RegisterRoutes(v1)
 
+		// Register health routes under v1
+		healthHandler.RegisterRoutes(v1)
+
 		// Ping endpoint for testing
 		v1.GET("/ping", func(c *gin.Context) {
 			c.JSON(http.StatusOK, gin.H{"message": "pong", "timestamp": time.Now().Unix()})
@@ -143,6 +151,7 @@ func main() {
 		fmt.Println("🔗 Available endpoints:")
 		fmt.Println("   - Authentication: /api/auth/*")
 		fmt.Println("   - Collaboration: /api/collaboration/*")
+		fmt.Println("   - System health metrics: /api/v1/health/*")
 		fmt.Println("   - Integrations: /api/integration/*")
 		fmt.Println("   - Reports: /api/v1/reports/*")
 
@@ -224,7 +233,7 @@ func initDatabase(config *Config) (*gorm.DB, error) {
 // runAllMigrations runs migrations for all modules
 func runAllMigrations(db *gorm.DB) error {
 	// Auto-migrate all models from all modules
-	return db.AutoMigrate(
+	err := db.AutoMigrate(
 		// Collaboration models
 		&collaboration.ProjectMember{},
 		&collaboration.ProjectInvitation{},
@@ -232,6 +241,14 @@ func runAllMigrations(db *gorm.DB) error {
 		&collaboration.Comment{},
 		&collaboration.Task{},
 		&collaboration.SharedResource{},
+
+		// Health models
+		&health.SystemMetric{},
+		&health.ServiceHealthCheck{},
+		&health.HealthCheckResult{},
+		&health.SystemAlert{},
+		&health.ServiceDependency{},
+		&health.SystemStatusSnapshot{},
 
 		// Integration models
 		&integration.IntegrationConnection{},
@@ -248,6 +265,37 @@ func runAllMigrations(db *gorm.DB) error {
 		&reports.BenchmarkDataset{},
 		&reports.DashboardWidget{},
 	)
+
+	if err != nil {
+		return err
+	}
+
+	// Enable TimescaleDB extension and create hypertables
+	db.Exec("CREATE EXTENSION IF NOT EXISTS timescaledb")
+
+	// Helper to create hypertable if it doesn't exist
+	createHypertable := func(tableName, timeCol string) error {
+		var exists bool
+		db.Raw("SELECT EXISTS (SELECT 1 FROM _timescaledb_catalog.hypertable WHERE table_name = ?)", tableName).Scan(&exists)
+		if !exists {
+			if err := db.Exec(fmt.Sprintf("SELECT create_hypertable('%s', '%s')", tableName, timeCol)).Error; err != nil {
+				return fmt.Errorf("failed to create hypertable %s: %w", tableName, err)
+			}
+		}
+		return nil
+	}
+
+	if err := createHypertable("system_metrics", "time"); err != nil {
+		return err
+	}
+	if err := createHypertable("health_check_results", "check_time"); err != nil {
+		return err
+	}
+	if err := createHypertable("system_status_snapshots", "snapshot_time"); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // corsMiddleware adds CORS headers
