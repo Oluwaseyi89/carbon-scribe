@@ -136,7 +136,48 @@ impl BufferPoolContract {
             Ok(false)
         }
     }
+
+    pub fn set_governance_address(
+        env: Env,
+        current_governance: Address,
+        new_governance: Address,
+    ) -> Result<(), Error> {
+        let governance = get_governance(&env);
+
+        if current_governance != governance {
+            return Err(Error::Unauthorized);
+        }
+
+        current_governance.require_auth();
+
+        set_governance(&env, &new_governance);
+
+        Ok(())
+    }
+
+    pub fn set_replenishment_rate(
+        env: Env,
+        governance: Address,
+        new_percentage: i64,
+    ) -> Result<(), Error> {
+        let current_governance = get_governance(&env);
+
+        if governance != current_governance {
+            return Err(Error::Unauthorized);
+        }
+
+        governance.require_auth();
+
+        if new_percentage < 0 || new_percentage > 10000 {
+            return Err(Error::InvalidPercentage);
+        }
+
+        set_replenishment_percentage(&env, new_percentage);
+
+        Ok(())
+    }
 }
+
 
 
 
