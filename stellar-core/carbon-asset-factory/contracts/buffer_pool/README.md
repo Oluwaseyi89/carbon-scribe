@@ -1,133 +1,157 @@
-# Buffer Pool Smart Contract
+# CarbonScribe Buffer Pool
+**Carbon Credit Risk Mitigation Reserve**
 
-A decentralized insurance pool for CarbonScribe that holds a percentage of issued carbon credits and automatically replaces invalidated credits.
+![Stellar](https://img.shields.io/badge/Stellar-Soroban-blue)
+![Rust](https://img.shields.io/badge/Rust-Smart_Contract-orange)
+![Contract](https://img.shields.io/badge/Role-Insurance_Reserve-green)
 
-## Overview
+The Buffer Pool contract is CarbonScribe's on-chain insurance reserve. It accumulates a configurable percentage of issued credits and gives governance a controlled mechanism to replace invalidated credits without breaking retirement integrity.
 
-The Buffer Pool contract manages custody of carbon credit tokens to provide insurance against invalidation. When carbon credits are minted, a configurable percentage is automatically deposited into the pool. If credits are later invalidated, governance can withdraw replacement credits from the pool.
+## Key Capabilities
 
-## Features
+- Automatic reserve replenishment in basis points
+- Manual custody deposit support for admin and core asset contract
+- Governance-only replacement withdrawals
+- Per-token custody records with timestamp and project lineage
+- Public TVL and custody query endpoints
 
-- **Automatic Replenishment**: Configurable percentage of minted credits automatically deposited
-- **Governance-Controlled Withdrawals**: Only governance can withdraw credits for replacement
-- **Transparent Operations**: All state changes emit events for off-chain tracking
-- **Custody Tracking**: Complete records of deposited tokens with timestamps and project IDs
-- **Query Functions**: View pool statistics and token custody information
+## Table of Contents
 
-## Core Functions
+1. [System Role](#system-role)
+2. [Contract Architecture](#contract-architecture)
+3. [Repository Structure](#repository-structure)
+4. [Public Interface](#public-interface)
+5. [Operational Flow](#operational-flow)
+6. [Build and Test](#build-and-test)
+7. [Testnet Deployment](#testnet-deployment)
+8. [Security Notes](#security-notes)
 
-### Initialize
+## System Role
 
-```rust
-pub fn initialize(
-    env: Env,
-    admin: Address,
-    governance: Address,
-    carbon_asset_contract: Address,
-    initial_percentage: i64,
-) -> Result<(), Error>
+Within CarbonScribe's settlement layer, this contract acts as a protocol-level shock absorber:
+
+1. Credits are minted in the primary carbon asset contract.
+2. A configured reserve fraction is routed into this pool.
+3. If credits are later invalidated, governance withdraws replacement credits from pool custody.
+4. Corporate retirement trust remains protected by on-chain traceability.
+
+## Contract Architecture
+
+```text
++--------------------------+
+| Carbon Asset Contract    |
+| (mint and auto_deposit)  |
++------------+-------------+
+             |
+             v
++--------------------------+
+| Buffer Pool Contract     |
+| - custody records        |
+| - replenishment rate     |
+| - total value locked     |
++------------+-------------+
+             |
+             v
++--------------------------+
+| Governance Withdrawal    |
+| withdraw_to_replace(...) |
++--------------------------+
 ```
 
-One-time setup of the pool. Sets admin, governance, carbon contract, and replenishment rate (in basis points, 0-10000).
+## Repository Structure
 
-### Deposit
-
-```rust
-pub fn deposit(
-    env: Env,
-    caller: Address,
-    token_id: u32,
-    project_id: String,
-) -> Result<(), Error>
+```text
+buffer_pool/
+|- src/
+|  |- lib.rs              # contract logic and public entrypoints
+|  |- storage.rs          # custody, tvl, and config keys
+|  |- events.rs           # deposit and withdrawal events
+|  |- errors.rs           # typed contract errors
+|  \- test.rs             # unit tests
+|- tests/
+|  \- integration_test.rs # integration scenarios
+\- Cargo.toml
 ```
 
-Manually deposit a credit into the pool. Only callable by admin or carbon_asset_contract.
+## Public Interface
 
-### Auto-Deposit
-
-```rust
-pub fn auto_deposit(
-    env: Env,
-    carbon_contract_caller: Address,
-    token_id: u32,
-    project_id: String,
-    total_minted: u32,
-) -> Result<bool, Error>
-```
-
-Called automatically during minting process. Uses modulo calculation to determine if token should be deposited based on replenishment percentage.
-
-Formula: `token_id % (10000 / replenishment_percentage) == 0`
-
-Example: 5% rate (500 basis points) = every 20th token
-
-### Withdraw to Replace
+### Initialization
 
 ```rust
-pub fn withdraw_to_replace(
-    env: Env,
-    governance_caller: Address,
-    token_id: u32,
-    target_invalidated_token: u32,
-) -> Result<(), Error>
+initialize(env, admin, governance, carbon_asset_contract, initial_percentage)
 ```
 
-Governance withdraws a credit from the pool to replace an invalidated token.
+One-time setup with:
 
-### Configuration Functions
+- `admin`: emergency and configuration authority
+- `governance`: replacement withdrawal authority
+- `carbon_asset_contract`: trusted auto-deposit caller
+- `initial_percentage`: reserve rate in basis points, must be `0..=10000`
+
+### Deposits
 
 ```rust
-pub fn set_governance_address(
-    env: Env,
-    current_governance: Address,
-    new_governance: Address,
-) -> Result<(), Error>
-
-pub fn set_replenishment_rate(
-    env: Env,
-    governance: Address,
-    new_percentage: i64,
-) -> Result<(), Error>
+deposit(env, caller, token_id, project_id)
+auto_deposit(env, carbon_contract_caller, token_id, project_id, total_minted)
 ```
 
-### Query Functions
+- `deposit`: manual custody intake, restricted to admin or linked carbon contract
+- `auto_deposit`: deterministic reserve intake, returns `true` when deposited
+
+Selection formula:
+
+`token_id % (10000 / percentage) == 0`
+
+At 500 bps (5%), approximately every 20th token is reserved.
+
+### Replacement Withdrawal
 
 ```rust
-pub fn get_total_value_locked(env: Env) -> i128
-pub fn get_custody_record(env: Env, token_id: u32) -> Option<CustodyRecord>
-pub fn is_token_in_pool(env: Env, token_id: u32) -> bool
+withdraw_to_replace(env, governance_caller, token_id, target_invalidated_token)
 ```
 
-## Build
+Governance removes a pool token to replace a specific invalidated token.
+
+### Governance and Queries
+
+```rust
+set_governance_address(env, current_governance, new_governance)
+set_replenishment_rate(env, governance, new_percentage)
+get_total_value_locked(env)
+get_custody_record(env, token_id)
+is_token_in_pool(env, token_id)
+```
+
+## Operational Flow
+
+```text
+Mint -> auto_deposit decision -> custody write -> TVL increment
+Invalidation event -> governance withdrawal -> TVL decrement -> replacement trace
+```
+
+## Build and Test
 
 ```bash
+cd contracts/buffer_pool
+cargo test
 cargo build --target wasm32-unknown-unknown --release
 ```
 
-## Test
+## Testnet Deployment
 
 ```bash
-cargo test
-```
-
-## Deploy
-
-```bash
+cd contracts/buffer_pool
 soroban contract deploy \
-  --wasm target/wasm32-unknown-unknown/release/buffer_pool.wasm \
-  --source <YOUR_SECRET_KEY> \
+  --wasm ../../target/wasm32-unknown-unknown/release/buffer_pool.wasm \
+  --source <IDENTITY_NAME> \
   --rpc-url https://soroban-testnet.stellar.org:443 \
   --network-passphrase "Test SDF Network ; September 2015"
 ```
 
-## Security Considerations
+## Security Notes
 
-- All admin functions require proper authorization via `require_auth()`
-- Percentage values validated to prevent overflow (0-10000 basis points)
-- Duplicate deposits prevented
-- Only governance can withdraw credits
-- Events emitted for all state changes
-
-## Performance
-
-The auto_deposit function is optimized for fast execution (<200ms) using simple modulo arithmetic for allocation decisions.
+- Authorization checks enforce role boundaries for all privileged actions.
+- Reserve rate is bounded to avoid invalid arithmetic and policy abuse.
+- Duplicate custody entries are rejected.
+- Withdrawals are limited to governance.
+- Event emission supports auditable off-chain monitoring.
