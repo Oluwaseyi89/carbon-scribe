@@ -790,3 +790,71 @@ model IpfsDocument {
   @@index([referenceId])
 }
 
+// ==========================================
+// Framework Registry (methodology-to-framework mapping)
+// ==========================================
+
+model Framework {
+  id              String   @id @default(cuid())
+  code            String   @unique // GHG, CSRD, SBTi, CORSIA, CBAM
+  name            String
+  description     String?
+  requirements    Json?    // List of requirement IDs and their metadata
+  mappings        FrameworkMethodologyMapping[]
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@map("frameworks")
+}
+
+model SyncedMethodology {
+  id              String   @id @default(cuid())
+  tokenId         Int      @unique
+  name            String
+  description     String?
+  registry        String?
+  category        String?
+  authority       String?
+  mappings        FrameworkMethodologyMapping[]
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@map("synced_methodologies")
+}
+
+model FrameworkMethodologyMapping {
+  id              String   @id @default(cuid())
+  frameworkId     String
+  methodologyId   String   // References SyncedMethodology
+  methodologyTokenId Int      // Original token ID from contract
+  requirementIds  String[] // Which requirements this methodology fulfills
+  mappingType     String   // AUTO, MANUAL, SYSTEM
+  mappedBy        String?  // User ID or "system"
+  mappedAt        DateTime @default(now())
+  isActive        Boolean  @default(true)
+  metadata        Json?    // Additional mapping context
+  
+  framework       Framework @relation(fields: [frameworkId], references: [id])
+  methodology     SyncedMethodology @relation(fields: [methodologyId], references: [id])
+  
+  @@unique([frameworkId, methodologyId])
+  @@index([methodologyTokenId])
+  @@map("framework_methodology_mappings")
+}
+
+model MappingRule {
+  id              String   @id @default(cuid())
+  name            String
+  description     String?
+  conditionType   String   // REGISTRY, METHODOLOGY_TYPE, AUTHORITY, KEYWORD
+  conditionValue  String   // "VERRA", "FORESTRY", etc.
+  targetFramework String   // GHG_PROTOCOL, CSRD, etc.
+  targetRequirements String[] // Requirement IDs to map to
+  priority        Int      @default(0)
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@map("mapping_rules")
+}
+
