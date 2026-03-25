@@ -891,3 +891,39 @@ model TransactionConfirmation {
 
   @@map("transaction_confirmations")
 }
+
+// ==========================================
+// Analytics Service Models
+// ==========================================
+
+model AnalyticsCache {
+  id              String   @id @default(cuid())
+  metricType      String   // DASHBOARD, QUALITY, REGIONAL, PERFORMANCE, etc.
+  period          String   // DAILY, WEEKLY, MONTHLY, QUARTERLY
+  date            DateTime
+  companyId       String?
+  data            Json     // Pre-calculated aggregations
+  expiresAt       DateTime
+  createdAt       DateTime @default(now())
+
+  @@index([metricType, period, date])
+  @@index([companyId])
+  @@index([expiresAt])
+  @@map("analytics_cache")
+}
+
+model ProjectScorecard {
+  id              String   @id @default(cuid())
+  projectId       String
+  calculationDate DateTime
+  qualityScore    Float    // 0-100 composite
+  metrics         Json     // Individual metric scores
+  riskFactors     Json
+  performanceRank Int?     // Within region/category
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([projectId, calculationDate])
+  @@index([performanceRank])
+  @@map("project_scorecards")
+}
