@@ -21,12 +21,15 @@ import { IpfsModule } from './ipfs/ipfs.module';
 import { RbacModule } from './rbac/rbac.module';
 import { CreditModule } from './credit/credit.module';
 import { FrameworkRegistryModule } from './framework-registry/framework-registry.module';
+import { CsrdModule } from './csrd/csrd.module';
+import { DatabaseModule } from './shared/database/database.module';
 import { ScheduleModule } from '@nestjs/schedule';
 
 @Module({
   imports: [
     ConfigModule,
     LoggerModule,
+    DatabaseModule,
     SecurityModule,
     RbacModule,
     ScheduleModule.forRoot(),
@@ -45,6 +48,7 @@ import { ScheduleModule } from '@nestjs/schedule';
     IpfsModule,
     CreditModule,
     FrameworkRegistryModule,
+    CsrdModule,
   ],
   controllers: [AppController],
   providers: [AppService],
