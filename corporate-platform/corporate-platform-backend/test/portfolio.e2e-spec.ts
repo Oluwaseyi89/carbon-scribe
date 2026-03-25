@@ -2,8 +2,6 @@ import { Test, TestingModule } from '@nestjs/testing';
 import {
   INestApplication,
   ValidationPipe,
-  Logger,
-  ForbiddenException,
   ExecutionContext,
   UnauthorizedException,
 } from '@nestjs/common';

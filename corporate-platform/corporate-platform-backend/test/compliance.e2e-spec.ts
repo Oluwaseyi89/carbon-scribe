@@ -25,12 +25,24 @@ describe('CSRD Compliance API Integration Tests', () => {
           findUnique: jest.fn().mockResolvedValue(null),
           findMany: jest.fn().mockResolvedValue([]),
           findFirst: jest.fn().mockResolvedValue(null),
-          create: jest.fn().mockImplementation((args) => Promise.resolve({ id: 'mock-id', ...args.data })),
-          update: jest.fn().mockImplementation((args) => Promise.resolve({ id: args.where.id || 'mock-id', ...args.data })),
+          create: jest
+            .fn()
+            .mockImplementation((args) =>
+              Promise.resolve({ id: 'mock-id', ...args.data }),
+            ),
+          update: jest
+            .fn()
+            .mockImplementation((args) =>
+              Promise.resolve({ id: args.where.id || 'mock-id', ...args.data }),
+            ),
           delete: jest.fn().mockResolvedValue({}),
           deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
           count: jest.fn().mockResolvedValue(0),
-          upsert: jest.fn().mockImplementation((args) => Promise.resolve({ id: 'mock-id', ...args.update })),
+          upsert: jest
+            .fn()
+            .mockImplementation((args) =>
+              Promise.resolve({ id: 'mock-id', ...args.update }),
+            ),
         };
       }
       return target[prop];
