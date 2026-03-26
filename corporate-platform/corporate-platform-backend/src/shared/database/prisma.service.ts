@@ -170,7 +170,10 @@ export class PrismaService
           companyId,
         );
         if (scopedArgs.data) {
-          scopedArgs.data = this.mergeDataWithTenant(scopedArgs.data, companyId);
+          scopedArgs.data = this.mergeDataWithTenant(
+            scopedArgs.data,
+            companyId,
+          );
         }
         return scopedArgs;
       case 'upsert':
@@ -242,7 +245,9 @@ export class PrismaService
     }
 
     if (Array.isArray(existingData)) {
-      return existingData.map((entry) => this.mergeDataWithTenant(entry, companyId));
+      return existingData.map((entry) =>
+        this.mergeDataWithTenant(entry, companyId),
+      );
     }
 
     if (typeof existingData !== 'object') {
