@@ -1,5 +1,5 @@
 import { ExecutionContext } from '@nestjs/common';
-import { Tenant } from './tenant.decorator';
+import { resolveTenantFromContext } from './tenant.decorator';
 
 describe('@Tenant decorator', () => {
   it('returns tenant context from the request', () => {
@@ -18,11 +18,7 @@ describe('@Tenant decorator', () => {
       }),
     } as unknown as ExecutionContext;
 
-    const factory = (Tenant as any).factory as (
-      data: unknown,
-      context: ExecutionContext,
-    ) => unknown;
-    const value = factory(undefined, ctx);
+    const value = resolveTenantFromContext(ctx);
 
     expect(value).toEqual(request.tenant);
   });

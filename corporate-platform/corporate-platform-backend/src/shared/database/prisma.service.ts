@@ -68,41 +68,48 @@ export class PrismaService
     const adapter = new PrismaPg(pool);
     super({ adapter });
 
-    this.$use(async (params, next) => {
-      const model = params.model;
-      if (!model) {
-        return next(params);
-      }
+    const extendedClient = this.$extends({
+      query: {
+        $allModels: {
+          $allOperations: async ({ model, operation, args, query }) => {
+            if (!model) {
+              return query(args);
+            }
 
-      const tenant = this.tenantContextStore.getContext();
-      if (!tenant || tenant.bypassIsolation) {
-        return next(params);
-      }
+            const tenant = this.tenantContextStore.getContext();
+            if (!tenant || tenant.bypassIsolation) {
+              return query(args);
+            }
 
-      if (
-        !this.scopedModelsWithCompanyId.has(model) &&
-        !this.scopedModelsByRelation.has(model)
-      ) {
-        return next(params);
-      }
+            if (
+              !this.scopedModelsWithCompanyId.has(model) &&
+              !this.scopedModelsByRelation.has(model)
+            ) {
+              return query(args);
+            }
 
-      if (this.scopedModelsWithCompanyId.has(model)) {
-        params.args = this.applyDirectCompanyScope(
-          params.action,
-          params.args,
-          tenant.companyId,
-        );
-        return next(params);
-      }
+            if (this.scopedModelsWithCompanyId.has(model)) {
+              const scopedArgs = this.applyDirectCompanyScope(
+                operation,
+                args,
+                tenant.companyId,
+              );
+              return query(scopedArgs);
+            }
 
-      params.args = this.applyRelationalCompanyScope(
-        model,
-        params.action,
-        params.args,
-        tenant.companyId,
-      );
-      return next(params);
+            const scopedArgs = this.applyRelationalCompanyScope(
+              model,
+              operation,
+              args,
+              tenant.companyId,
+            );
+            return query(scopedArgs);
+          },
+        },
+      },
     });
+
+    Object.assign(this, extendedClient);
   }
 
   async onModuleInit() {
