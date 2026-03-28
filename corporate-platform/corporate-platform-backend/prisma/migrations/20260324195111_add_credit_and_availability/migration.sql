@@ -5,7 +5,7 @@
 
 */
 -- DropForeignKey
-ALTER TABLE "credit_availability_logs" DROP CONSTRAINT "fk_credit";
+ALTER TABLE "credit_availability_logs" DROP CONSTRAINT IF EXISTS "fk_credit";
 
 -- AlterTable
 ALTER TABLE "credit_availability_logs" ALTER COLUMN "id" DROP DEFAULT,

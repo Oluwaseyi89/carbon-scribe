@@ -42,19 +42,23 @@ BEGIN
 END
 $$;
 
--- transaction_confirmations: enforce company FK + index
-CREATE INDEX IF NOT EXISTS "transaction_confirmations_companyId_idx"
-ON "transaction_confirmations"("companyId");
-
+-- transaction_confirmations: enforce company FK + index (guarded: table may not exist)
 DO $$
 BEGIN
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_constraint WHERE conname = 'transaction_confirmations_companyId_fkey'
+  IF EXISTS (
+    SELECT 1 FROM information_schema.tables WHERE table_name = 'transaction_confirmations' AND table_schema = 'public'
   ) THEN
-    ALTER TABLE "transaction_confirmations"
-    ADD CONSTRAINT "transaction_confirmations_companyId_fkey"
-    FOREIGN KEY ("companyId") REFERENCES "Company"("id")
-    ON DELETE RESTRICT ON UPDATE CASCADE;
+    IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = 'transaction_confirmations_companyId_idx') THEN
+      EXECUTE 'CREATE INDEX "transaction_confirmations_companyId_idx" ON "transaction_confirmations"("companyId")';
+    END IF;
+    IF NOT EXISTS (
+      SELECT 1 FROM pg_constraint WHERE conname = 'transaction_confirmations_companyId_fkey'
+    ) THEN
+      ALTER TABLE "transaction_confirmations"
+      ADD CONSTRAINT "transaction_confirmations_companyId_fkey"
+      FOREIGN KEY ("companyId") REFERENCES "Company"("id")
+      ON DELETE RESTRICT ON UPDATE CASCADE;
+    END IF;
   END IF;
 END
 $$;
