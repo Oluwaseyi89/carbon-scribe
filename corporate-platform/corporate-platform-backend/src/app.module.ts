@@ -32,6 +32,7 @@ import { OwnershipHistoryModule } from './audit/ownership-history/ownership-hist
 import { CorsiaModule } from './corsia/corsia.module';
 import { AuditTrailModule } from './audit-trail/audit-trail.module';
 import { GhgProtocolModule } from './ghg-protocol/ghg-protocol.module';
+import { TeamCollaborationModule } from './team-collaboration/team-collaboration.module';
 
 @Module({
   imports: [
@@ -64,6 +65,7 @@ import { GhgProtocolModule } from './ghg-protocol/ghg-protocol.module';
     CorsiaModule,
     AuditTrailModule,
     GhgProtocolModule,
+    TeamCollaborationModule,
   ],
   controllers: [AppController],
   providers: [AppService],

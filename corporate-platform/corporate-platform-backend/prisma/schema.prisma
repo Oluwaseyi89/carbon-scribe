@@ -46,6 +46,9 @@ model Company {
   flightRecords          FlightRecord[]
   corsiaComplianceYears  CorsiaComplianceYear[]
   corsiaEligibleCredits  CorsiaEligibleCredit[]
+  teamActivities         TeamActivity[]
+  collaborationMetrics   CollaborationMetric[]
+  memberEngagements      MemberEngagement[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1231,6 +1234,70 @@ model CreditTransfer {
   @@index([purchaseId])
   @@index([companyId])
   @@index([status])
+}
+
+// ==========================================
+// Team Collaboration & Analytics
+// ==========================================
+
+model TeamActivity {
+  id              String   @id @default(cuid())
+  companyId       String
+  userId          String
+  activityType    String   // LOGIN, RETIREMENT_CREATED, REPORT_GENERATED, etc.
+  entityType      String?  // Retirement, Report, Target
+  entityId        String?
+  metadata        Json     // Additional context
+  ipAddress       String?
+  userAgent       String?
+  timestamp       DateTime @default(now())
+  
+  company         Company  @relation(fields: [companyId], references: [id])
+  
+  @@index([companyId, timestamp])
+  @@index([userId, timestamp])
+  @@map("team_activities")
+}
+
+model CollaborationMetric {
+  id              String   @id @default(cuid())
+  companyId       String
+  periodStart     DateTime
+  periodEnd       DateTime
+  metricType      String   // WEEKLY_SCORE, MONTHLY_SCORE
+  overallScore    Float    // 0-100 composite
+  components      Json     // Individual factor scores
+  topContributors Json     // Most engaged members
+  insights        String[] // Key observations
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  company         Company  @relation(fields: [companyId], references: [id])
+  
+  @@index([companyId, periodStart])
+  @@index([companyId, metricType])
+  @@map("collaboration_metrics")
+}
+
+model MemberEngagement {
+  id              String   @id @default(cuid())
+  companyId       String
+  userId          String
+  periodStart     DateTime
+  periodEnd       DateTime
+  actionsCount    Int
+  uniqueDays      Int
+  contributions   Json     // Breakdown by action type
+  collaborationScore Float // Peer interaction score
+  responseTimeAvg Float?   // Avg response time to mentions
+  lastUpdated     DateTime @updatedAt
+  
+  company         Company  @relation(fields: [companyId], references: [id])
+  
+  @@unique([companyId, userId, periodStart, periodEnd])
+  @@index([companyId, periodStart])
+  @@index([companyId, userId])
+  @@map("member_engagements")
 }
 
 // ==========================================
