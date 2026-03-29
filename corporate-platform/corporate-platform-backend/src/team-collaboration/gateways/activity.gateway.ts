@@ -27,7 +27,7 @@ export class ActivityGateway
 
   constructor(private readonly redis: RedisService) {}
 
-  afterInit(server: Server) {
+  afterInit() {
     this.logger.log('Activity Gateway initialized');
     this.setupRedisSubscriber();
   }

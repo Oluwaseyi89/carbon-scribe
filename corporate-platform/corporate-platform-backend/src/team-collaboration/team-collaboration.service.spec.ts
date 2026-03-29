@@ -9,20 +9,9 @@ import { NotificationsService } from './services/notifications.service';
 describe('TeamCollaborationService', () => {
   let service: TeamCollaborationService;
   let activityFeedService: ActivityFeedService;
-  let performanceMetricsService: PerformanceMetricsService;
   let collaborationScoreService: CollaborationScoreService;
   let memberDetailsService: MemberDetailsService;
   let notificationsService: NotificationsService;
-
-  const mockPrismaService = {};
-  const mockRedisService = {
-    getClient: jest.fn(() => ({
-      get: jest.fn(),
-      set: jest.fn(),
-      publish: jest.fn(),
-      subscribe: jest.fn(),
-    })),
-  };
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -77,7 +66,6 @@ describe('TeamCollaborationService', () => {
 
     service = module.get<TeamCollaborationService>(TeamCollaborationService);
     activityFeedService = module.get<ActivityFeedService>(ActivityFeedService);
-    performanceMetricsService = module.get<PerformanceMetricsService>(PerformanceMetricsService);
     collaborationScoreService = module.get<CollaborationScoreService>(CollaborationScoreService);
     memberDetailsService = module.get<MemberDetailsService>(MemberDetailsService);
     notificationsService = module.get<NotificationsService>(NotificationsService);
