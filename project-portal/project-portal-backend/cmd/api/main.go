@@ -23,6 +23,7 @@ import (
 	"carbon-scribe/project-portal/project-portal-backend/internal/integration"
 	integrationstellar "carbon-scribe/project-portal/project-portal-backend/internal/integration/stellar"
 	"carbon-scribe/project-portal/project-portal-backend/internal/project"
+	"carbon-scribe/project-portal/project-portal-backend/internal/project/inventory"
 	"carbon-scribe/project-portal/project-portal-backend/internal/project/methodology"
 	"carbon-scribe/project-portal/project-portal-backend/internal/reports"
 	"carbon-scribe/project-portal/project-portal-backend/internal/search"
@@ -172,6 +173,14 @@ func main() {
 	}
 	settingsHandler := settings.NewHandler(settingsService)
 
+	// Initialize inventory service for on-chain credit querying
+	inventoryCacheTTL := parseDuration(cfg.Soroban.InventoryCacheTTL, 5*time.Minute)
+	inventoryRepo := inventory.NewRepository(db)
+	sorobanClient := inventory.NewMockSorobanClient()
+	inventoryService := inventory.NewService(inventoryRepo, sorobanClient, inventoryCacheTTL)
+	inventoryHandler := inventory.NewHandler(inventoryService)
+	log.Println("✅ Credit inventory service initialized")
+
 	// Setup Gin
 	if !cfg.Debug {
 		gin.SetMode(gin.ReleaseMode)
@@ -189,7 +198,7 @@ func main() {
 			"service":   "carbon-scribe-project-portal",
 			"timestamp": time.Now().Format(time.RFC3339),
 			"version":   "1.0.0",
-			"modules":   []string{"auth", "collaboration", "documents", "integration", "reports", "search", "geospatial", "settings", "financing"},
+			"modules":   []string{"auth", "collaboration", "documents", "integration", "reports", "search", "geospatial", "settings", "financing", "inventory"},
 		})
 	})
 
@@ -210,6 +219,7 @@ func main() {
 				"geospatial":    "/api/v1/geospatial/*",
 				"settings":      "/api/v1/settings/*",
 				"financing":     "/api/v1/financing/*",
+				"inventory":     "/api/v1/projects/:id/inventory/*",
 			},
 		})
 	})
@@ -224,6 +234,9 @@ func main() {
 		// Register projects routes under v1
 		projectHandler.RegisterRoutes(v1)
 		methodologyHandler.RegisterRoutes(v1)
+
+		// Register inventory routes under v1 (on-chain credit queries)
+		inventoryHandler.RegisterRoutes(v1)
 
 		// Register reports routes under v1
 		reportsHandler.RegisterRoutes(v1)
@@ -416,6 +429,9 @@ func runAllMigrations(db *gorm.DB) error {
 		&methodology.MethodologyCap{},
 		&methodology.MintingAttempt{},
 		&methodology.CapConfigurationSource{},
+
+		// Inventory models
+		&inventory.ProjectCreditCache{},
 	)
 
 	if err != nil {
