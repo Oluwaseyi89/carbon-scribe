@@ -23,11 +23,20 @@ const mockApi = vi.mocked(api);
 
 describe('TeamSlice', () => {
   let slice: CollaborationSlice;
-  let mockSet: ReturnType<typeof vi.fn>;
+  let mockSet: any;
 
   beforeEach(() => {
     vi.clearAllMocks();
-    mockSet = vi.fn();
+    mockSet = vi.fn((update) => {
+      // If update is a function, call it with current state
+      if (typeof update === 'function') {
+        const newState = update(slice);
+        Object.assign(slice, newState);
+      } else {
+        // If update is an object, merge it with current state
+        Object.assign(slice, update);
+      }
+    });
     slice = createCollaborationSlice(mockSet, () => slice);
   });
 
@@ -540,82 +549,103 @@ describe('TeamSlice', () => {
     });
 
     it('should clear team errors', () => {
-      // Set some errors
-      slice.collaborationErrors.members = 'Error fetching members';
-      slice.collaborationErrors.invitations = 'Error fetching invitations';
+      // Set some errors through the mock set function
+      mockSet({
+        collaborationErrors: {
+          members: 'Error fetching members',
+          invitations: 'Error fetching invitations',
+          activities: null,
+          comments: null,
+          tasks: null,
+          resources: null,
+          invite: null,
+          removeMember: null,
+          createComment: null,
+          createTask: null,
+          updateTask: null,
+          createResource: null,
+        }
+      });
 
       slice.clearCollaborationErrors();
 
-      expect(mockSet).toHaveBeenCalledWith(
-        expect.objectContaining({
-          collaborationErrors: expect.objectContaining({
-            members: null,
-            invitations: null,
-            activities: null,
-            comments: null,
-            tasks: null,
-            resources: null,
-            invite: null,
-            removeMember: null,
-            createComment: null,
-            createTask: null,
-            updateTask: null,
-            createResource: null,
-          }),
-        })
-      );
+      // Check that the errors were cleared
+      expect(slice.collaborationErrors.members).toBe(null);
+      expect(slice.collaborationErrors.invitations).toBe(null);
+      expect(slice.collaborationErrors.activities).toBe(null);
+      expect(slice.collaborationErrors.comments).toBe(null);
+      expect(slice.collaborationErrors.tasks).toBe(null);
+      expect(slice.collaborationErrors.resources).toBe(null);
+      expect(slice.collaborationErrors.invite).toBe(null);
+      expect(slice.collaborationErrors.removeMember).toBe(null);
+      expect(slice.collaborationErrors.createComment).toBe(null);
+      expect(slice.collaborationErrors.createTask).toBe(null);
+      expect(slice.collaborationErrors.updateTask).toBe(null);
+      expect(slice.collaborationErrors.createResource).toBe(null);
     });
 
-    it('should reset team state completely', () => {
-      // Set some state
-      slice.currentProjectId = 'team-project-1';
-      slice.members = [{ id: '1', user_id: 'user1', role: 'Owner' } as any];
-      slice.invitations = [{ id: '1', email: 'test@example.com', role: 'Contributor', status: 'pending' } as any];
-      slice.collaborationErrors.members = 'Some error';
+    it('should reset collaboration state', () => {
+      // Set some state through the mock set function
+      mockSet({
+        currentProjectId: 'team-project-1',
+        members: [{ id: '1', user_id: 'user1', role: 'Owner' } as any],
+        invitations: [{ id: '1', email: 'test@example.com', role: 'Contributor', status: 'pending' } as any],
+        collaborationErrors: {
+          members: 'Some error',
+          invitations: null,
+          activities: null,
+          comments: null,
+          tasks: null,
+          resources: null,
+          invite: null,
+          removeMember: null,
+          createComment: null,
+          createTask: null,
+          updateTask: null,
+          createResource: null,
+        }
+      });
 
       slice.resetCollaborationState();
 
-      expect(mockSet).toHaveBeenCalledWith(
-        expect.objectContaining({
-          currentProjectId: null,
-          members: [],
-          invitations: [],
-          activities: [],
-          activitiesPagination: { limit: 20, offset: 0, total: 0 },
-          activityTypeFilter: 'All',
-          comments: [],
-          tasks: [],
-          resources: [],
-          collaborationLoading: expect.objectContaining({
-            members: false,
-            invitations: false,
-            activities: false,
-            comments: false,
-            tasks: false,
-            resources: false,
-            invite: false,
-            removeMember: false,
-            createComment: false,
-            createTask: false,
-            updateTask: false,
-            createResource: false,
-          }),
-          collaborationErrors: expect.objectContaining({
-            members: null,
-            invitations: null,
-            activities: null,
-            comments: null,
-            tasks: null,
-            resources: null,
-            invite: null,
-            removeMember: null,
-            createComment: null,
-            createTask: null,
-            updateTask: null,
-            createResource: null,
-          }),
-        })
-      );
+      // Check that the state was reset correctly
+      expect(slice.currentProjectId).toBe(null);
+      expect(slice.members).toEqual([]);
+      expect(slice.invitations).toEqual([]);
+      expect(slice.activities).toEqual([]);
+      expect(slice.activitiesPagination).toEqual({ limit: 20, offset: 0, total: 0 });
+      expect(slice.activityTypeFilter).toBe('All');
+      expect(slice.comments).toEqual([]);
+      expect(slice.tasks).toEqual([]);
+      expect(slice.resources).toEqual([]);
+      expect(slice.collaborationLoading).toEqual({
+        members: false,
+        invitations: false,
+        activities: false,
+        comments: false,
+        tasks: false,
+        resources: false,
+        invite: false,
+        removeMember: false,
+        createComment: false,
+        createTask: false,
+        updateTask: false,
+        createResource: false,
+      });
+      expect(slice.collaborationErrors).toEqual({
+        members: null,
+        invitations: null,
+        activities: null,
+        comments: null,
+        tasks: null,
+        resources: null,
+        invite: null,
+        removeMember: null,
+        createComment: null,
+        createTask: null,
+        updateTask: null,
+        createResource: null,
+      });
     });
   });
 
@@ -656,13 +686,9 @@ describe('TeamSlice', () => {
         slice.fetchInvitations('team-1'),
       ]);
 
-      // Both should complete successfully
-      expect(mockSet).toHaveBeenCalledWith(
-        expect.objectContaining({
-          members: mockMembers,
-          invitations: mockInvitations,
-        })
-      );
+      // Check that both operations completed successfully by checking the final state
+      expect(slice.members).toEqual(mockMembers);
+      expect(slice.invitations).toEqual(mockInvitations);
     });
   });
 
@@ -698,14 +724,11 @@ describe('TeamSlice', () => {
         slice.fetchResources('team-1'),
       ]);
 
-      expect(mockSet).toHaveBeenCalledWith(
-        expect.objectContaining({
-          members: [],
-          invitations: [],
-          tasks: [],
-          resources: [],
-        })
-      );
+      // Check that the state was updated with empty arrays
+      expect(slice.members).toEqual([]);
+      expect(slice.invitations).toEqual([]);
+      expect(slice.tasks).toEqual([]);
+      expect(slice.resources).toEqual([]);
     });
   });
 });
