@@ -199,63 +199,64 @@ JWT_EXPIRY=15m
 ```
 corporate-platform-backend/
 ├── src/
-│   ├── retirement/                 # Retirement module
-│   │   ├── dto/                    # Data transfer objects
-│   │   │   ├── retire-credits.dto.ts
-│   │   │   └── retirement-query.dto.ts
-│   │   ├── services/               
-│   │   │   ├── instant-retirement.service.ts
-│   │   │   ├── validation.service.ts
-│   │   │   ├── certificate.service.ts
-│   │   │   └── history.service.ts
-│   │   ├── retirement.controller.ts
-│   │   ├── retirement.service.ts
-│   │   └── retirement.module.ts
-│   ├── compliance/                  # Compliance module
-│   │   ├── compliance.controller.ts
-│   │   ├── reporting-engine.service.ts
-│   │   └── compliance.module.ts
-│   ├── marketplace/                 # Marketplace module
-│   │   ├── marketplace.controller.ts
-│   │   ├── discovery-engine.service.ts
-│   │   └── marketplace.module.ts
-│   ├── stellar/                     # Blockchain integration
-│   │   ├── stellar.service.ts
-│   │   ├── soroban.service.ts
-│   │   └── stellar.module.ts
-│   ├── webhooks/                     # Webhook handlers
-│   │   ├── webhooks.controller.ts
-│   │   ├── stellar-webhook.service.ts
-│   │   └── webhooks.module.ts
-│   ├── analytics/                     # Analytics module
-│   │   ├── analytics.controller.ts
-│   │   ├── impact-dashboard.service.ts
-│   │   └── analytics.module.ts
-│   ├── shared/                        # Shared resources
-│   │   ├── database/
-│   │   │   ├── database.module.ts
-│   │   │   └── prisma.service.ts      # Prisma client service
-│   │   ├── cache/
-│   │   │   └── redis.service.ts       # Redis cache
-│   │   ├── ipfs/
-│   │   │   └── ipfs.service.ts        # IPFS storage
-│   │   ├── guards/                     # Auth guards
-│   │   └── interceptors/               # HTTP interceptors
-│   ├── app.module.ts
+│   ├── analytics/
+│   ├── api-key/
+│   ├── app.controller.spec.ts
 │   ├── app.controller.ts
-│   └── main.ts
+│   ├── app.module.ts
+│   ├── app.service.ts
+│   ├── auction/
+│   ├── audit/
+│   ├── audit-trail/
+│   ├── auth/
+│   ├── cache/
+│   ├── cart/
+│   ├── cbam/
+│   ├── compliance/
+│   ├── config/
+│   ├── corsia/
+│   ├── credit/
+│   ├── csrd/
+│   ├── event-bus/
+│   ├── framework-registry/
+│   ├── ghg-protocol/
+│   ├── ipfs/
+│   ├── logger/
+│   ├── main.ts
+│   ├── marketplace/
+│   ├── multi-tenant/
+│   ├── order/
+│   ├── portfolio/
+│   ├── rbac/
+│   ├── retirement/
+│   ├── retirement-analytics/
+│   ├── retirement-scheduling/
+│   ├── security/
+│   ├── shared/
+│   ├── shims.d.ts
+│   ├── stellar/
+│   ├── team-collaboration/
+│   ├── team-management/
+│   ├── types/
+│   └── webhooks/
 ├── prisma/
-│   ├── schema.prisma                   # Database schema
-│   └── migrations/                      # Migration files
+│   ├── schema.prisma
+│   └── migrations/
 ├── test/
+│   ├── api-key-integration.e2e-spec.ts
+│   ├── app.e2e-spec.ts
+│   ├── compliance.e2e-spec.ts
+│   ├── jest-e2e.json
+│   ├── marketplace.e2e-spec.ts
+│   ├── portfolio.e2e-spec.ts
 │   ├── retirement.e2e-spec.ts
-│   └── compliance.e2e-spec.ts
+│   └── team-collaboration.e2e-spec.ts
 ├── .env.example
 ├── .eslintrc.js
 ├── .prettierrc
 ├── nest-cli.json
 ├── package.json
-├── prisma.config.js                     # Prisma 7+ config
+├── prisma.config.js
 ├── tsconfig.json
 └── README.md
 ```

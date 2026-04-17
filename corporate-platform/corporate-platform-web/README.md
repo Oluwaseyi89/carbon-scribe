@@ -27,20 +27,46 @@ A modern Next.js web application for corporate buyers to purchase, manage, and r
 
 ## Project Structure
 
+
 ```
-    src/
-    ├── app/                    # App router pages
-    ├── components/            # Reusable components
-    │   ├── layout/           # Layout components (Navbar, Sidebar)
-    │   ├── dashboard/        # Dashboard components
-    │   ├── marketplace/      # Credit marketplace components
-    │   ├── retirement/       # Retirement components
-    │   ├── analytics/        # Analytics components
-    │   └── theme/           # Theme provider
-    ├── contexts/             # React contexts
-    ├── lib/                  # Utilities and mock data
-    ├── types/               # TypeScript definitions
-    └── utils/               # Helper functions
+src/
+├── app/
+│   ├── analytics/
+│   ├── api/
+│   ├── compliance/
+│   ├── corporate/
+│   ├── favicon.ico
+│   ├── globals.css
+│   ├── layout.tsx
+│   ├── marketplace/
+│   ├── page.tsx
+│   ├── portfolio/
+│   ├── projects/
+│   ├── reporting/
+│   ├── retirement/
+│   ├── settings/
+│   └── team/
+├── components/
+│   ├── actions/
+│   ├── analytics/
+│   ├── dashboard/
+│   ├── feed/
+│   ├── goals/
+│   ├── layout/
+│   ├── marketplace/
+│   ├── reporting/
+│   ├── retirement/
+│   └── theme/
+├── contexts/
+│   └── CorporateContext.tsx
+├── hooks/
+│   └── useTheme.ts
+├── lib/
+│   ├── analytics/
+│   ├── compliance/
+│   └── mockData.ts
+├── types/
+│   └── index.ts
 ```
 
 ---
