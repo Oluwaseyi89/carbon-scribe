@@ -144,6 +144,7 @@ const TokenizationWizard: React.FC<TokenizationWizardProps> = ({ projectId, onCr
 
   const renderProgressBar = () => {
     const steps: WizardStep[] = ['calculate', 'review', 'mint', 'complete'];
+    const currentIndex = steps.indexOf(currentStep);
     return (
       <div className="flex items-center justify-between mb-8">
         {steps.map((step, index) => (
@@ -153,7 +154,7 @@ const TokenizationWizard: React.FC<TokenizationWizardProps> = ({ projectId, onCr
             </div>
             <span className="ml-2 text-sm font-medium capitalize">{step}</span>
             {index < steps.length - 1 && (
-              <div className={`flex-1 h-1 mx-4 ${stepIndex < index ? 'bg-gray-200' : 'bg-emerald-600'}`} />
+              <div className={`flex-1 h-1 mx-4 ${currentIndex < index ? 'bg-gray-200' : 'bg-emerald-600'}`} />
             )}
           </div>
         ))}
