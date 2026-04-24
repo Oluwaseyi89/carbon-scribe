@@ -11,8 +11,15 @@ const mockUseStore = vi.mocked(useStore);
 const mockProject: Project = {
   id: 'proj-1',
   name: 'Carbon Initiative',
-  description: 'A carbon reduction project',
+  type: 'reforestation',
+  location: 'Nairobi, Kenya',
+  area: 500,
+  farmers: 25,
+  carbon_credits: 1200,
+  progress: 65,
+  icon: '🌱',
   status: 'active',
+  start_date: '2024-01-01',
   created_at: '2024-01-01T00:00:00Z',
   updated_at: '2024-01-01T00:00:00Z',
 };
