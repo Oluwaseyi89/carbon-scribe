@@ -1,14 +1,12 @@
-import {
-  ConflictException,
-  Injectable,
-  Logger,
-  NotFoundException,
-} from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { createHash } from 'crypto';
 import { PrismaService } from '../../shared/database/prisma.service';
 import { RetirementTrackerService } from '../../stellar/soroban/contracts/retirement-tracker.service';
 import { EventLoggerService } from './event-logger.service';
-import { AuditAction, AuditEventType } from '../interfaces/audit-event.interface';
+import {
+  AuditAction,
+  AuditEventType,
+} from '../interfaces/audit-event.interface';
 import {
   AnchorHashInput,
   AnchorHashResult,
@@ -87,7 +85,9 @@ export class RetirementAuditHashService {
     }
 
     // ── Create or reuse a PENDING/FAILED DB record ───────────────────────
-    let anchor: Awaited<ReturnType<typeof this.prisma.retirementAuditHashAnchor.create>>;
+    let anchor: Awaited<
+      ReturnType<typeof this.prisma.retirementAuditHashAnchor.create>
+    >;
 
     if (existing) {
       // FAILED record — reset to PENDING for retry
@@ -323,7 +323,9 @@ export class RetirementAuditHashService {
       });
     } catch (err) {
       // Log failure but do not propagate — audit-of-audit should never block anchoring.
-      this.logger.warn(`Companion audit event failed: ${this.extractMessage(err)}`);
+      this.logger.warn(
+        `Companion audit event failed: ${this.extractMessage(err)}`,
+      );
     }
   }
 
