@@ -258,6 +258,44 @@ corporate-platform-backend/
 ├── package.json
 ├── prisma.config.js
 ├── tsconfig.json
+
+## Stellar Transfer API (Frontend Integration)
+
+The backend exposes transfer endpoints used by the corporate web client:
+
+- `POST /api/v1/stellar/transfers`
+- `POST /api/v1/stellar/transfers/batch`
+- `GET /api/v1/stellar/purchases/:id/transfer-status`
+
+Compatibility note:
+
+- `GET /api/v1/purchases/:id/transfer-status` remains available for legacy clients.
+
+Single transfer request body:
+
+- `purchaseId`: string
+- `companyId`: string
+- `projectId`: string
+- `amount`: number (minimum `1`)
+- `contractId`: string
+- `fromAddress`: string
+- `toAddress`: string
+
+Batch request body:
+
+- `transfers`: `InitiateTransferDto[]`
+
+Transfer status response fields can include:
+
+- `id`
+- `purchaseId`
+- `companyId`
+- `projectId`
+- `amount`
+- `status` (`PENDING`, `CONFIRMED`, `FAILED`)
+- `transactionHash`
+- `errorMessage`
+- `confirmedAt`
 └── README.md
 ```
 ---
@@ -357,6 +395,8 @@ Core endpoints:
 - `GET /api/v1/audit-trail/chain/integrity`
 - `POST /api/v1/audit-trail/anchor`
 - `GET /api/v1/audit-trail/export`
+- `POST /api/v1/audit/anchor-hash` - Anchor an audit hash to a retirement record
+- `GET /api/v1/audit/verify-hash/:tokenId` - Verify the audit hash for a given retirement record
 
 Optional manual creation endpoint (JWT scoped):
 
@@ -378,6 +418,73 @@ Decorator usage summary:
 - Provide `entityType` and `entityId` mapping from args/result.
 - Expose `auditTrailService` on the class and ensure user context (`companyId`, `sub`/`userId`) is accessible via class state or method args.
 
+
+## SBTi Service API (Science Based Targets initiative)
+
+The backend provides a full SBTi (Science Based Targets initiative) service module for managing, validating, and tracking corporate climate targets in line with SBTi v5.0 criteria.
+
+### Base Path
+`/api/v1/sbti`
+
+### Endpoints
+
+#### Create SBTi Target
+- **POST** `/api/v1/sbti/targets`
+  - **Body:** `CreateTargetDto` (targetType, baseYear, targetYear, reductionPercent, companyId, etc.)
+  - **Returns:** Created target object
+
+#### List Company Targets
+- **GET** `/api/v1/sbti/targets?companyId=...`
+  - **Query:** `companyId` (string, required)
+  - **Returns:** Array of SBTi targets for the company
+
+#### Get Target Progress
+- **GET** `/api/v1/sbti/targets/:id/progress`
+  - **Params:** `id` (UUID, required)
+  - **Returns:** Progress breakdown for the target (current emissions, reduction achieved, % complete)
+
+#### Validate Target (SBTi v5.0)
+- **POST** `/api/v1/sbti/targets/:id/validate`
+  - **Params:** `id` (UUID, required)
+  - **Returns:** Validation result (criteria met, errors, recommendations)
+
+#### SBTi Progress Dashboard
+- **GET** `/api/v1/sbti/dashboard?companyId=...`
+  - **Query:** `companyId` (string, required)
+  - **Returns:** Company-wide SBTi dashboard (targets, progress, gaps)
+
+#### Calculate Retirement Gap
+- **GET** `/api/v1/sbti/retirement-gap?companyId=...`
+  - **Query:** `companyId` (string, required)
+  - **Returns:** Amount of additional retirements needed to meet SBTi targets
+
+### Authentication
+All endpoints require JWT authentication. Some may require company admin or compliance roles.
+
+### Example: Create Target
+```json
+POST /api/v1/sbti/targets
+{
+  "companyId": "uuid",
+  "targetType": "ABSOLUTE",
+  "baseYear": 2020,
+  "targetYear": 2030,
+  "reductionPercent": 42
+}
+```
+
+### Example: Validate Target
+```json
+POST /api/v1/sbti/targets/uuid/validate
+Response:
+{
+  "isValid": true,
+  "criteria": ["Scope 1+2 reduction >= 42% by 2030"],
+  "errors": []
+}
+```
+
+---
 ## GHG Protocol Service Module
 
 The backend now includes a dedicated GHG Protocol module at `src/ghg-protocol/` for Scope 1, 2, and 3 accounting backed by Prisma models, seeded emission factors, and audit-trail events.

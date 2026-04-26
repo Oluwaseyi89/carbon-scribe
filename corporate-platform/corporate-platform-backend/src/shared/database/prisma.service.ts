@@ -39,6 +39,7 @@ export class PrismaService
     'Report',
     'Activity',
     'ApiKey',
+    'ContractCall',
     'TeamMember',
     'Role',
     'Invitation',
