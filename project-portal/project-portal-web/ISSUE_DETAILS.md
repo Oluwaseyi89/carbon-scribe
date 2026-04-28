@@ -1,42 +1,45 @@
 # Objective:
-Standardize button components, styles, and interactions across the application to ensure a cohesive and professional user experience.
+Ensure all user-triggered mutations (create, update, delete actions) provide immediate feedback via toast notifications, improving clarity and user confidence in the application.
 
 ## Background
-Currently, button styles and behaviors vary between modals, forms, tables, and other UI elements. This inconsistency can confuse users and detract from the overall polish of the application. Unifying button styles and interactions will improve usability, accessibility, and maintainability.
+Currently, some actions—such as project creation, integration connect/disconnect, and other mutations—do not provide toast notifications to inform users of success or failure. This can leave users uncertain about the outcome of their actions. Consistent toast notifications enhance UX by confirming actions, surfacing errors, and guiding next steps.
 
 ## Tasks
-1. **Audit Existing Button Usage**
-   - Identify all button variants and usages across the app (primary, secondary, danger, icon, etc.).
-   - Document inconsistencies in style, size, color, and interaction.
+1. **Audit All Mutation Actions**
+   - Identify all places where users perform mutations (create, update, delete, connect, disconnect, etc.).
+   - Document which actions currently lack toast notifications.
 
-2. **Design Unified Button System**
-   - Define a set of standard button variants (e.g., primary, secondary, danger, outline, icon-only).
-   - Specify consistent sizes, colors, border radii, shadows, and spacing.
-   - Document hover, active, disabled, and focus states for each variant.
+2. **Design Standard Toast Notification Patterns**
+   - Define standard toast types (success, error, info, warning) and their appearance.
+   - Specify message structure: concise, actionable, and context-aware.
+   - Ensure toasts are accessible (screen reader friendly, keyboard dismissible).
 
-3. **Implement Reusable Button Component(s)**
-   - Create or refactor a reusable Button component that supports all standard variants and states.
-   - Ensure accessibility (ARIA, keyboard navigation, focus indicators) is built-in.
-   - Support loading and icon states as needed.
+3. **Implement Toast Notifications for All Mutations**
+   - Add toast notifications to all mutation actions, including but not limited to:
+     - Project creation, update, deletion
+     - Integration connect/disconnect
+     - Settings changes
+     - API key management
+     - Billing actions
+   - Ensure both success and error states are handled.
 
-4. **Refactor Existing Buttons**
-   - Replace all ad-hoc or inconsistent button implementations with the unified Button component.
-   - Update styles in modals, forms, tables, toolbars, and dialogs.
+4. **Consistency & UX**
+   - Use a single toast notification system/component throughout the app.
+   - Avoid duplicate or excessive notifications.
+   - Allow users to dismiss toasts manually; auto-dismiss after a short duration.
 
 5. **Testing & Validation**
-   - Test all button variants and states across browsers and devices.
-   - Validate accessibility and keyboard navigation.
-   - Ensure visual consistency in both light and dark mode.
+   - Test all mutation flows to ensure toasts appear as expected for both success and error cases.
+   - Validate accessibility and responsiveness of toast notifications.
 
 6. **Documentation**
-   - Document the Button component API, usage examples, and design guidelines.
-   - Provide a migration guide for updating or adding new buttons.
+   - Document toast notification usage, patterns, and guidelines for future mutations.
+   - Provide examples for adding toasts to new features.
 
 ## Acceptance Criteria
-- All buttons use the unified component and follow the standard design system.
-- Button interactions and states are visually and functionally consistent.
-- Buttons are accessible and work in all supported themes.
-- Documentation is updated with button usage and best practices.
+- All mutation actions provide clear toast notifications for both success and error outcomes.
+- Toasts are consistent, accessible, and non-intrusive.
+- Documentation is updated with toast notification best practices.
 
 ---
 
