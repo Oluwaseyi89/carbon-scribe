@@ -41,12 +41,15 @@ export async function logoutApi(refreshToken: string): Promise<void> {
 }
 
 export async function getProfileApi(token: string): Promise<AuthUser> {
-  const response = await apiRequest<{ user: AuthUser }>(`${AUTH_PREFIX}/me`, {
-    method: 'GET',
-    headers: {
-      Authorization: `Bearer ${token}`,
+  const response = await apiRequest<{ user: AuthUser }>(
+    `${AUTH_PREFIX}/me`,
+    {
+      method: 'GET',
     },
-  });
+    {
+      token,
+    },
+  );
   return response.user;
 }
 

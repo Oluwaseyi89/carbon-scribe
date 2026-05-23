@@ -84,6 +84,14 @@ export class PrismaService
               return query(args);
             }
 
+            // Strip internal marker set when we redirect findUnique → findFirst
+            // to prevent the re-triggered extension call from double-scoping.
+            if ((args as any).__tenantScopeApplied) {
+              const cleanArgs = { ...(args as any) };
+              delete cleanArgs.__tenantScopeApplied;
+              return query(cleanArgs);
+            }
+
             const tenant = this.tenantContextStore.getContext();
             if (!tenant || tenant.bypassIsolation) {
               return query(args);
@@ -97,6 +105,28 @@ export class PrismaService
             }
 
             if (this.scopedModelsWithCompanyId.has(model)) {
+              // Prisma's findUnique/findUniqueOrThrow do not support AND in WHERE.
+              // Redirect to findFirst/findFirstOrThrow so we can apply tenant scope
+              // via AND without triggering a PrismaClientValidationError.
+              if (
+                operation === 'findUnique' ||
+                operation === 'findUniqueOrThrow'
+              ) {
+                const redirectOp =
+                  operation === 'findUnique' ? 'findFirst' : 'findFirstOrThrow';
+                const scopedArgs = {
+                  ...args,
+                  where: this.mergeWhereWithTenant(
+                    (args as any).where,
+                    tenant.companyId,
+                  ),
+                  __tenantScopeApplied: true,
+                };
+                // extendedClient is captured in this closure and is defined by the
+                // time any query runs (JS closures capture by reference).
+                return (extendedClient as any)[model][redirectOp](scopedArgs);
+              }
+
               const scopedArgs = this.applyDirectCompanyScope(
                 operation,
                 args,
@@ -152,8 +182,8 @@ export class PrismaService
     const scopedArgs = args ? { ...args } : {};
 
     switch (action) {
-      case 'findUnique':
-      case 'findUniqueOrThrow':
+      // findUnique/findUniqueOrThrow are handled upstream (redirected to
+      // findFirst/findFirstOrThrow) because Prisma rejects AND in findUnique WHERE.
       case 'findFirst':
       case 'findFirstOrThrow':
       case 'findMany':

@@ -33,15 +33,11 @@ describe('StellarApiClient', () => {
 
     expect(result.purchaseId).toBe('ord_1')
     expect(fetchImpl).toHaveBeenCalledTimes(1)
-    expect(fetchImpl).toHaveBeenCalledWith(
-      'http://localhost:4000/api/v1/stellar/transfers',
-      expect.objectContaining({
-        method: 'POST',
-        headers: expect.objectContaining({
-          Authorization: 'Bearer token-123',
-        }),
-      }),
-    )
+    const [url, init] = fetchImpl.mock.calls[0] as [string, RequestInit]
+    expect(url).toBe('http://localhost:4000/api/v1/stellar/transfers')
+    expect(init.method).toBe('POST')
+    const headers = init.headers as Headers
+    expect(headers.get('Authorization')).toBe('Bearer token-123')
   })
 
   it('throws ApiError when backend returns failure', async () => {

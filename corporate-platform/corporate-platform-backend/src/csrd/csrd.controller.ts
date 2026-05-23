@@ -1,4 +1,13 @@
-import { Body, Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import {
   ApiTags,
   ApiOperation,
@@ -10,15 +19,17 @@ import { CreateMaterialityAssessmentDto } from './dto/assessment.dto';
 import {
   DisclosureQueryDto,
   RecordDisclosureDto,
+  UpdateAssuranceDto,
 } from './dto/disclosure-query.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../rbac/guards/permissions.guard';
 import { IpWhitelistGuard } from '../security/guards/ip-whitelist.guard';
 import { Permissions } from '../rbac/decorators/permissions.decorator';
 import {
-  COMPLIANCE_VIEW,
+  COMPLIANCE_AUDIT,
   COMPLIANCE_SUBMIT,
   COMPLIANCE_VERIFY_RETIREMENT,
+  COMPLIANCE_VIEW,
 } from '../rbac/constants/permissions.constants';
 import { CompanyId } from '../shared/decorators/company-id.decorator';
 
@@ -64,8 +75,18 @@ export class CsrdController {
 
   @Get('disclosures/requirements')
   @Permissions(COMPLIANCE_VIEW)
-  async getRequirements(@Query('standard') standard: string) {
+  async getRequirements(@Query('standard') standard?: string) {
     return this.csrdService.getRequirements(standard);
+  }
+
+  @Patch('disclosures/:id/assurance')
+  @Permissions(COMPLIANCE_AUDIT)
+  async updateAssurance(
+    @CompanyId() companyId: string,
+    @Param('id') disclosureId: string,
+    @Body() dto: UpdateAssuranceDto,
+  ) {
+    return this.csrdService.updateAssurance(companyId, disclosureId, dto);
   }
 
   @Post('reports/generate')

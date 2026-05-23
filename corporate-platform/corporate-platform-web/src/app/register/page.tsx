@@ -3,6 +3,10 @@
 import React, { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import Link from 'next/link';
+import {
+  REGISTER_PASSWORD_ERROR,
+  validateRegisterPassword,
+} from '@/lib/auth/password';
 
 export default function RegisterPage() {
   const { register, isLoading } = useAuth();
@@ -38,8 +42,9 @@ export default function RegisterPage() {
       return;
     }
 
-    if (formData.password.length < 8) {
-      setError('Password must be at least 8 characters long');
+    const passwordError = validateRegisterPassword(formData.password);
+    if (passwordError) {
+      setError(passwordError);
       return;
     }
 
@@ -57,11 +62,11 @@ export default function RegisterPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-green-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 px-4 py-12">
+    <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-blue-50 via-white to-green-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 px-4 py-12">
       <div className="max-w-md w-full space-y-8">
         {/* Logo and Title */}
         <div className="text-center">
-          <div className="mx-auto h-16 w-16 bg-gradient-to-br from-blue-600 to-green-600 rounded-2xl flex items-center justify-center mb-4">
+          <div className="mx-auto h-16 w-16 bg-linear-to-br from-blue-600 to-green-600 rounded-2xl flex items-center justify-center mb-4">
             <svg
               className="h-10 w-10 text-white"
               fill="none"
@@ -189,7 +194,7 @@ export default function RegisterPage() {
                 required
               />
               <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                Must be at least 8 characters
+                {REGISTER_PASSWORD_ERROR}
               </p>
             </div>
 
@@ -215,7 +220,7 @@ export default function RegisterPage() {
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-gradient-to-r from-blue-600 to-green-600 hover:from-blue-700 hover:to-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+              className="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-linear-to-r from-blue-600 to-green-600 hover:from-blue-700 hover:to-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
             >
               {isLoading ? (
                 <div className="flex items-center">

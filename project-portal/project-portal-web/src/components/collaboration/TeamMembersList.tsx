@@ -5,6 +5,7 @@ import { useStore } from '@/lib/store/store';
 import { ROLES_CAN_MANAGE } from '@/lib/store/collaboration/collaboration.types';
 import RoleBadge from './RoleBadge';
 import type { ProjectMember } from '@/lib/store/collaboration/collaboration.types';
+import EmptyState from '@/components/ui/EmptyState';
 
 interface TeamMembersListProps {
   projectId: string;
@@ -74,10 +75,11 @@ export default function TeamMembersList({ projectId, canManage }: TeamMembersLis
 
   if (members.length === 0) {
     return (
-      <div className="text-center py-8 text-gray-500">
-        <Users className="w-12 h-12 mx-auto mb-2 text-gray-300" data-testid="users-icon" />
-        <p>No team members yet. Invite people to collaborate.</p>
-      </div>
+      <EmptyState
+        icon={<Users className="w-8 h-8" />}
+        title="No team members yet"
+        description="Invite people to collaborate on this project."
+      />
     );
   }
 

@@ -34,14 +34,30 @@ export async function apiRequest<T>(
 ): Promise<T> {
   const fetchImpl = options.fetchImpl ?? fetch
   const baseUrl = options.baseUrl ?? DEFAULT_API_BASE_URL
-  const response = await fetchImpl(buildUrl(baseUrl, path), {
-    ...init,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(options.token ? { Authorization: `Bearer ${options.token}` } : {}),
-      ...(init.headers ?? {}),
-    },
-  })
+  const headers = new Headers(init.headers)
+
+  if (!headers.has('Content-Type') && init.body) {
+    headers.set('Content-Type', 'application/json')
+  }
+
+  if (options.token) {
+    headers.set('Authorization', `Bearer ${options.token}`)
+  }
+
+  let response: Response
+
+  try {
+    response = await fetchImpl(buildUrl(baseUrl, path), {
+      ...init,
+      headers,
+    })
+  } catch (error) {
+    throw new ApiError(
+      0,
+      `Unable to reach the API at ${baseUrl}. Check that the backend is running and CORS allows this origin.`,
+      error,
+    )
+  }
 
   const rawBody = await response.text()
   const parsedBody = rawBody ? safeJsonParse(rawBody) : null

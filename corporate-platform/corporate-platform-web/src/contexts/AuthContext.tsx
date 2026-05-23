@@ -2,7 +2,13 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
-import type { AuthUser, LoginCredentials, RegisterCredentials } from '@/types/auth.types';
+import type {
+  AuthPermission,
+  AuthRole,
+  AuthUser,
+  LoginCredentials,
+  RegisterCredentials,
+} from '@/types/auth.types';
 import {
   loginApi,
   registerApi,
@@ -10,6 +16,11 @@ import {
   logoutApi,
   getProfileApi,
 } from '@/lib/api/auth.api';
+import {
+  canAccessRoute as canAccessRouteByRole,
+  getPermissionsForRole,
+  normalizeRole,
+} from '@/lib/auth/rbac';
 import {
   storeTokens,
   getAccessToken,
@@ -23,8 +34,14 @@ import {
 
 interface AuthContextType {
   user: AuthUser | null;
+  role: AuthRole | null;
+  permissions: AuthPermission[];
   isLoading: boolean;
   isAuthenticated: boolean;
+  hasRole: (role: AuthRole) => boolean;
+  hasAnyRole: (roles: AuthRole[]) => boolean;
+  hasPermission: (permission: AuthPermission) => boolean;
+  canAccessRoute: (path: string) => { allowed: boolean; reason?: string };
   login: (credentials: LoginCredentials) => Promise<void>;
   register: (credentials: RegisterCredentials) => Promise<void>;
   logout: () => Promise<void>;
@@ -47,6 +64,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
 
+  const syncProfile = useCallback(async (token: string): Promise<AuthUser | null> => {
+    if (!token) {
+      return null
+    }
+
+    try {
+      const profile = await getProfileApi(token)
+      storeUser(profile)
+      setUser(profile)
+      return profile
+    } catch (error) {
+      console.error('Profile sync failed:', error)
+      return null;
+    }
+  }, []);
+
   // Initialize auth state from storage
   useEffect(() => {
     const initAuth = async () => {
@@ -55,7 +88,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const token = getAccessToken();
 
         if (storedUser && token && !isTokenExpired()) {
-          setUser(storedUser);
+          const synced = await syncProfile(token);
+          if (!synced) {
+            clearAuthData();
+            setUser(null);
+          }
         } else if (hasRefreshToken()) {
           // Try to refresh the token
           const success = await refreshTokenSilently();
@@ -77,7 +114,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
 
     initAuth();
-  }, []);
+  }, [syncProfile]);
 
   // Silent token refresh (no loading state)
   const refreshTokenSilently = async (): Promise<boolean> => {
@@ -86,11 +123,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!refreshToken) return false;
 
       const response = await refreshApi(refreshToken);
+      if (!response.accessToken || !response.refreshToken) {
+        return false;
+      }
       
       // Store new tokens (backend returns 15min access token)
       storeTokens(response.accessToken, response.refreshToken, 900);
-      storeUser(response.user);
-      setUser(response.user);
+      const profile = await syncProfile(response.accessToken);
+      if (!profile) {
+        return false;
+      }
       
       return true;
     } catch (error) {
@@ -108,49 +150,57 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [syncProfile]);
 
   // Login function
   const login = useCallback(async (credentials: LoginCredentials) => {
-    setIsLoading(true);
+    setIsLoading(true)
     try {
-      const response = await loginApi(credentials);
-      
-      // Store tokens (access token expires in 15min = 900s)
-      storeTokens(response.accessToken, response.refreshToken, 900);
-      storeUser(response.user);
-      setUser(response.user);
+      const response = await loginApi(credentials)
 
-      // Redirect to dashboard or previous page
-      router.push('/corporate');
+      if (!response.accessToken || !response.refreshToken) {
+        throw new Error('Authentication response is missing tokens')
+      }
+
+      storeTokens(response.accessToken, response.refreshToken, 900)
+      const profile = await syncProfile(response.accessToken)
+      if (!profile) {
+        throw new Error('Unable to load user profile after login')
+      }
+
+      router.push('/')
     } catch (error) {
-      console.error('Login failed:', error);
-      throw error;
+      console.error('Login failed:', error)
+      throw error
     } finally {
-      setIsLoading(false);
+      setIsLoading(false)
     }
-  }, [router]);
+  }, [router, syncProfile])
 
   // Register function
   const register = useCallback(async (credentials: RegisterCredentials) => {
-    setIsLoading(true);
+    setIsLoading(true)
     try {
-      const response = await registerApi(credentials);
-      
-      // Store tokens (access token expires in 15min = 900s)
-      storeTokens(response.accessToken, response.refreshToken, 900);
-      storeUser(response.user);
-      setUser(response.user);
+      const response = await registerApi(credentials)
 
-      // Redirect to dashboard
-      router.push('/corporate');
+      if (!response.accessToken || !response.refreshToken) {
+        throw new Error('Registration response is missing tokens')
+      }
+
+      storeTokens(response.accessToken, response.refreshToken, 900)
+      const profile = await syncProfile(response.accessToken)
+      if (!profile) {
+        throw new Error('Unable to load user profile after registration')
+      }
+
+      router.push('/')
     } catch (error) {
-      console.error('Registration failed:', error);
-      throw error;
+      console.error('Registration failed:', error)
+      throw error
     } finally {
-      setIsLoading(false);
+      setIsLoading(false)
     }
-  }, [router]);
+  }, [router, syncProfile])
 
   // Logout function
   const logout = useCallback(async () => {
@@ -212,14 +262,43 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       router.push('/login');
     } else if (user && isPublicRoute(currentPath)) {
       // Redirect to dashboard if already authenticated
-      router.push('/corporate');
+      router.push('/');
     }
   }, [user, isLoading, pathname, router]);
 
+  const role: AuthRole | null = user ? normalizeRole(user.role) : null;
+  const permissions = user ? getPermissionsForRole(user.role) : [];
+
+  const hasRole = useCallback(
+    (expected: AuthRole) => !!role && role === expected,
+    [role],
+  );
+
+  const hasAnyRole = useCallback(
+    (roles: AuthRole[]) => !!role && roles.includes(role),
+    [role],
+  );
+
+  const hasPermission = useCallback(
+    (permission: AuthPermission) => permissions.includes(permission),
+    [permissions],
+  );
+
+  const canAccessRoute = useCallback(
+    (path: string) => canAccessRouteByRole(path, role),
+    [role],
+  );
+
   const value: AuthContextType = {
     user,
+    role,
+    permissions,
     isLoading,
     isAuthenticated: !!user,
+    hasRole,
+    hasAnyRole,
+    hasPermission,
+    canAccessRoute,
     login,
     register,
     logout,

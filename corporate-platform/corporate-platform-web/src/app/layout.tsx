@@ -2,10 +2,9 @@ import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
 import './globals.css'
 import { ThemeProvider } from '@/components/theme/ThemeProvider'
-import CorporateNavbar from '@/components/layout/CorporateNavbar'
-import CorporateSidebar from '@/components/layout/CorporateSidebar'
 import { CorporateProvider } from '@/contexts/CorporateContext'
 import { AuthProvider } from '@/contexts/AuthContext'
+import PlatformShell from '@/components/layout/PlatformShell'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -30,17 +29,7 @@ export default function RootLayout({
         >
           <AuthProvider>
             <CorporateProvider>
-              <div className="flex min-h-screen">
-                <CorporateSidebar />
-                <div className="flex-1 flex flex-col">
-                  <CorporateNavbar />
-                  <main className="flex-1 p-4 md:p-6 lg:p-8 overflow-auto">
-                    <div className="max-w-7xl mx-auto w-full">
-                      {children}
-                    </div>
-                  </main>
-                </div>
-              </div>
+              <PlatformShell>{children}</PlatformShell>
             </CorporateProvider>
           </AuthProvider>
         </ThemeProvider>

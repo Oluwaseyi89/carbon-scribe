@@ -179,42 +179,59 @@ export default function AnalyticsPage() {
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {kpiCards.map((kpi) => {
-          const Icon = kpi.icon;
-          const pct = kpi.change;
-          return (
-            <div key={kpi.title} className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
-              <div className="flex items-center justify-between mb-4">
-                <div className={`p-3 rounded-lg bg-linear-to-r ${kpi.color}`}>
-                  <Icon className="w-6 h-6 text-white" />
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6" aria-busy={loading} aria-label="KPI metrics">
+        {loading
+          ? Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 animate-pulse" aria-hidden="true">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="w-12 h-12 bg-gray-200 rounded-lg" />
+                  <div className="w-16 h-5 bg-gray-200 rounded" />
                 </div>
-                {pct !== undefined && (
-                  <div className={`flex items-center ${pct >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                    {pct >= 0 ? <TrendingUp className="w-4 h-4 mr-1" /> : <TrendingDown className="w-4 h-4 mr-1" />}
-                    <span className="font-medium">{pct >= 0 ? '+' : ''}{pct.toFixed(1)}%</span>
-                  </div>
-                )}
+                <div className="h-8 w-28 bg-gray-200 rounded mb-2" />
+                <div className="h-4 w-36 bg-gray-100 rounded" />
               </div>
-              {loading ? (
-                <div className="h-8 w-24 bg-gray-200 animate-pulse rounded" />
-              ) : (
-                <div className="text-2xl font-bold text-gray-900 mb-1">{kpi.value}</div>
-              )}
-              <div className="text-sm text-gray-600">{kpi.title}</div>
-            </div>
-          );
-        })}
+            ))
+          : kpiCards.map((kpi) => {
+              const Icon = kpi.icon;
+              const pct = kpi.change;
+              return (
+                <div key={kpi.title} className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className={`p-3 rounded-lg bg-linear-to-r ${kpi.color}`}>
+                      <Icon className="w-6 h-6 text-white" />
+                    </div>
+                    {pct !== undefined && (
+                      <div className={`flex items-center ${pct >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                        {pct >= 0 ? <TrendingUp className="w-4 h-4 mr-1" /> : <TrendingDown className="w-4 h-4 mr-1" />}
+                        <span className="font-medium">{pct >= 0 ? '+' : ''}{pct.toFixed(1)}%</span>
+                      </div>
+                    )}
+                  </div>
+                  <div className="text-2xl font-bold text-gray-900 mb-1">{kpi.value}</div>
+                  <div className="text-sm text-gray-600">{kpi.title}</div>
+                </div>
+              );
+            })}
       </div>
 
       {/* Time Series Chart */}
-      <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+      <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100" aria-busy={timeSeriesLoading}>
         <div className="flex items-center justify-between mb-6">
           <h3 className="text-xl font-bold text-gray-900">Performance Over Time</h3>
-          {timeSeriesLoading && <Loader2 className="w-5 h-5 animate-spin text-emerald-600" />}
+          {timeSeriesLoading && <Loader2 className="w-5 h-5 animate-spin text-emerald-600" aria-label="Loading chart data" />}
         </div>
 
-        {timeSeriesData.length === 0 && !timeSeriesLoading ? (
+        {timeSeriesLoading ? (
+          <div className="h-48 flex items-end gap-1 animate-pulse" aria-hidden="true">
+            {Array.from({ length: 12 }).map((_, i) => (
+              <div
+                key={i}
+                className="flex-1 bg-gray-200 rounded-t-sm"
+                style={{ height: `${30 + Math.random() * 60}%` }}
+              />
+            ))}
+          </div>
+        ) : timeSeriesData.length === 0 ? (
           <div className="h-48 flex items-center justify-center text-gray-500 bg-gray-50 rounded-xl">
             No time series data available for this metric and period.
           </div>

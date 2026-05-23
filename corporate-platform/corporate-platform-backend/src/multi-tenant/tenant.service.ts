@@ -31,7 +31,11 @@ export class TenantService {
   ];
 
   resolveTenantFromRequest(request: Request): TenantResolution {
-    if (this.isPublicRoute(request)) {
+    // Use originalUrl to get the full path — request.path is relative to the
+    // router mount point and returns '/' for all routes in NestJS middleware.
+    const path = this.extractPathFromRequest(request);
+
+    if (this.isPublicRoute(request, path)) {
       return {
         tenant: null,
         allowWithoutTenant: true,
@@ -56,7 +60,7 @@ export class TenantService {
     const jwtPayload = this.extractJwtPayload(request);
     const headerCompanyId = this.extractTenantHeader(request);
     const subdomainCompanyId = this.extractTenantFromSubdomain(request);
-    const pathCompanyId = this.extractTenantFromPath(request);
+    const pathCompanyId = this.extractTenantFromPath(request, path);
 
     const candidates = [
       jwtPayload?.companyId ?? null,
@@ -113,15 +117,26 @@ export class TenantService {
     throw new UnauthorizedException('Tenant context is required');
   }
 
-  isPublicRoute(request: Request): boolean {
+  isPublicRoute(request: Request, path?: string): boolean {
     const method = request.method.toUpperCase();
-    const path = request.path || request.url || '';
+    const requestPath = path || this.extractPathFromRequest(request);
 
-    if (method === 'GET' && path === '/') {
+    if (method === 'GET' && requestPath === '/') {
       return true;
     }
 
-    return this.publicRoutePatterns.some((pattern) => pattern.test(path));
+    return this.publicRoutePatterns.some((pattern) =>
+      pattern.test(requestPath),
+    );
+  }
+
+  private extractPathFromRequest(request: Request): string {
+    // request.path in NestJS middleware is relative to the router mount point
+    // and returns '/' for all routes. Use originalUrl to get the actual full path.
+    // Prefer request.path over request.url so test/mocked requests that override
+    // only `path` are interpreted correctly.
+    const fullUrl = request.originalUrl || request.path || request.url || '/';
+    return fullUrl.split('?')[0]; // Strip query string
   }
 
   extractRouteCompanyId(request: Request): string | null {
@@ -129,7 +144,10 @@ export class TenantService {
     if (direct) {
       return direct;
     }
-    return this.extractTenantFromPath(request);
+    return this.extractTenantFromPath(
+      request,
+      this.extractPathFromRequest(request),
+    );
   }
 
   resolveTenantFromApiKey(apiKey: ApiKeyAuthContext): TenantContext {
@@ -142,7 +160,7 @@ export class TenantService {
   }
 
   private shouldDeferToApiKeyGuard(request: Request): boolean {
-    const path = request.path || request.url || '';
+    const path = this.extractPathFromRequest(request);
     if (!path.startsWith('/api/v1/integrations/')) {
       return false;
     }
@@ -238,9 +256,12 @@ export class TenantService {
     return subdomain || null;
   }
 
-  private extractTenantFromPath(request: Request): string | null {
-    const path = request.path || request.url || '';
-    const match = path.match(/\/companies\/([^/]+)/);
+  private extractTenantFromPath(
+    request: Request,
+    path?: string,
+  ): string | null {
+    const requestPath = path || this.extractPathFromRequest(request);
+    const match = requestPath.match(/\/companies\/([^/]+)/);
     if (!match || !match[1]) {
       return null;
     }

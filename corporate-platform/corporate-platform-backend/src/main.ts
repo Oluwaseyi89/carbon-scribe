@@ -3,9 +3,54 @@ import { AppModule } from './app.module';
 import { ConfigService } from './config/config.service';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 
+function parseCorsOrigins(value?: string): string[] {
+  const defaults = ['http://localhost:3000', 'http://127.0.0.1:3000'];
+
+  const origins = (value ?? '')
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+
+  return origins.length > 0 ? origins : defaults;
+}
+
+function isLocalDevOrigin(origin: string): boolean {
+  return /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(origin);
+}
+
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   app.enableShutdownHooks();
+
+  const configuredOrigins = parseCorsOrigins(process.env.CORS_ORIGINS);
+
+  app.enableCors({
+    origin: (origin, callback) => {
+      if (!origin) {
+        callback(null, true);
+        return;
+      }
+
+      if (configuredOrigins.includes(origin) || isLocalDevOrigin(origin)) {
+        callback(null, true);
+        return;
+      }
+
+      callback(new Error(`CORS origin not allowed: ${origin}`), false);
+    },
+    credentials: true,
+    methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
+    allowedHeaders: [
+      'Content-Type',
+      'Authorization',
+      'X-Requested-With',
+      'X-Tenant-Id',
+      'X-Api-Key',
+      'x-api-key',
+      'Accept',
+    ],
+    optionsSuccessStatus: 204,
+  });
 
   const configService = app.get(ConfigService);
   const appConfig = configService.getAppConfig();
