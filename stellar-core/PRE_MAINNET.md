@@ -228,7 +228,7 @@ Current validation snapshot from this branch:
 
 ## Time Lock (20 issues)
 
-181. Replace initialization panic with typed `AlreadyInitialized` error.
+
 182. Add unit/integration tests (currently zero tests for this contract).
 183. Verify token transfer semantics: token ID should not be treated as fungible amount via SEP-41 client.
 184. Integrate with NFT-style transfer interface if required by `carbon_asset` ownership model.
