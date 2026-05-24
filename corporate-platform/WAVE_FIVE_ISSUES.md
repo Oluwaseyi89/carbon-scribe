@@ -6,17 +6,6 @@ The items below are intended as real production-readiness issues from the curren
 
 ## Frontend App: 150 Issues
 
-1. FE-001: Add route-level error boundaries across App Router pages
-   Create `error.tsx` handlers for portfolio, marketplace, retirement, analytics, compliance, team, projects, documents, settings, and reporting so a thrown React error does not blank the entire shell.
-
-2. FE-002: Add route-level loading states across all major pages
-   Create `loading.tsx` files for asynchronous pages so users see stable skeleton states instead of abrupt content pop-in during data fetches.
-
-3. FE-003: Normalize frontend auth token storage keys
-   Unify the currently mixed `accessToken`, `access_token`, and `cs_access_token` conventions so every service reads the same token source reliably.
-
-4. FE-004: Replace raw `localStorage` token lookups with shared auth storage utilities
-   Refactor service modules to consume the centralized auth storage helpers instead of reading browser storage directly in multiple incompatible ways.
 
 5. FE-005: Introduce request retry and backoff in the base API client
    Add bounded retry behavior for transient network and 5xx failures so the UI does not fail immediately on recoverable outages.
@@ -479,27 +468,6 @@ The items below are intended as real production-readiness issues from the curren
 7. BE-007: Add background repinning strategy for vulnerable IPFS artifacts
    Periodically revalidate and repin important certificates so decentralized storage reliability improves beyond one upload attempt.
 
-8. BE-008: Add hash verification between uploaded file and stored record
-   Persist and verify content digests so later retrieval can prove a certificate or evidence file has not changed.
-
-9. BE-009: Introduce provider abstraction for IPFS backends
-   Avoid binding certificate permanence to a single Pinata implementation so storage can evolve without rewriting business flows.
-
-10. BE-010: Add storage-class policy for critical versus non-critical documents
-   Define replication and retention expectations so audit certificates receive stronger durability than routine attachments.
-
-11. BE-011: Enforce maximum upload size and MIME policies centrally
-   Apply explicit server-side constraints for file type and size so uploads are controlled consistently across all document endpoints.
-
-12. BE-012: Add antivirus or content scanning for uploaded files
-   Scan evidence and certificate attachments before persisting or pinning them to reduce security risk from untrusted uploads.
-
-13. BE-013: Add streaming upload support for large files
-   Replace buffer-heavy upload assumptions so the service can handle enterprise document sizes without excessive memory pressure.
-
-14. BE-014: Add idempotency support for upload requests
-   Prevent duplicate document records when clients retry uncertain upload outcomes after timeouts or dropped connections.
-
 15. BE-015: Add certificate regeneration workflow for broken IPFS artifacts
    Provide an explicit recovery path when prior certificate uploads were stored with fallback or invalid storage metadata.
 
@@ -533,8 +501,7 @@ The items below are intended as real production-readiness issues from the curren
 25. BE-025: Add request body size limits at the Nest application layer
    Protect the service from oversized payloads and accidental memory exhaustion during uploads and bulk operations.
 
-26. BE-026: Add helmet and broader HTTP hardening middleware
-   Apply mature default protections for headers and common attack surfaces rather than depending only on CORS and Swagger configuration.
+
 
 27. BE-027: Add rate limiting for authentication endpoints
    Protect login, refresh, register, and password-reset flows from brute-force and credential-stuffing patterns.
@@ -565,9 +532,6 @@ The items below are intended as real production-readiness issues from the curren
 
 36. BE-036: Add Prometheus-compatible metrics endpoint and dashboards
    Export service health, queue depth, DB latency, upload success rates, and chain interaction metrics for runtime visibility.
-
-37. BE-037: Add health checks for database, Redis, Kafka, IPFS, and Stellar dependencies
-   Provide readiness and liveness endpoints that reflect actual external dependency status rather than only process availability.
 
 38. BE-038: Separate readiness from liveness probes
    Keep the service restart-safe under transient dependency failure while still preventing load balancers from routing to an unready instance.
@@ -626,8 +590,6 @@ The items below are intended as real production-readiness issues from the curren
 56. BE-056: Add replay-safe contract call persistence
    Ensure repeated status checks or retries do not produce duplicate contract call records for one on-chain attempt.
 
-57. BE-057: Add contract call idempotency and deduplication keys
-   Tie database contract-call records to business workflow IDs so operations can be resumed safely after failures.
 
 58. BE-058: Add contract-level timeout and gas budgeting policies
    Make chain invocation limits explicit so production workloads do not fail unpredictably under different payload sizes.
