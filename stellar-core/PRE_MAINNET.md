@@ -28,7 +28,7 @@ Current validation snapshot from this branch:
 5. Add optional requirement that `methodology_id` must exist before mint completion.
 6. Add mint-time host jurisdiction normalization and canonical code validation.
 7. Add safe increment check for `NextTokenId` overflow handling.
-8. Add replay-safe event sequencing field for off-chain indexers.
+
 9. Add invariant test ensuring burned tokens can never reappear in owner token lists.
 10. Add dedicated tests for all rejected status transitions (full transition matrix).
 11. Add dedicated tests for compliance hook failure paths (contract missing, malformed response).
@@ -46,7 +46,7 @@ Current validation snapshot from this branch:
 
 21. Replace `panic!("Contract already initialized")` with typed contract error.
 22. Add validation for `token_id > 0` and reject invalid IDs with explicit errors.
-23. Replace synthetic tx hash generation with actual transaction hash input or standardized event nonce.
+
 24. Validate burn call return/error surface from `carbon_asset` and map to `BurnFailed`.
 25. Add explicit cross-contract interface checks during initialization (method existence sanity).
 26. Add duplicate retirement prevention test across `retire` and `batch_retire` interleavings.
@@ -72,7 +72,7 @@ Current validation snapshot from this branch:
 43. Enforce non-zero governance and carbon contract addresses at initialization.
 44. Add validation that deposited token actually exists and is custodied by pool contract.
 45. Add cross-contract transfer-in call to ensure custody is real, not metadata-only.
-46. Add cross-contract transfer-out call in `withdraw_to_replace` before deleting custody record.
+
 47. Add TVL underflow/overflow protections using checked arithmetic.
 48. Add duplicate-token protection in `auto_deposit` path (same token deposited twice).
 49. Add replacement eligibility checks for `target_invalidated_token` before withdrawal.
@@ -90,7 +90,7 @@ Current validation snapshot from this branch:
 
 ## Methodology Library (20 issues)
 
-61. Require admin auth in `initialize` (currently missing explicit `require_auth`).
+
 62. Move critical config keys to instance storage where appropriate for lower rent pressure.
 63. Add metadata schema validation for `name`, `version`, and `registry_link` fields.
 64. Add URI format validation for `registry_link` and CID format validation for `ipfs_cid`.
@@ -117,7 +117,7 @@ Current validation snapshot from this branch:
 82. Replace all `unwrap()` governance/admin retrievals with typed initialization errors.
 83. Add validation that carbon asset contract address is non-zero and contract account.
 84. Add explicit rule schema validation (non-empty IDs, field length caps, enum consistency).
-85. Add duplicate rule conflict detection beyond exact `rule_id` collisions.
+
 86. Add deterministic rule priority ordering to avoid first-match ambiguity.
 87. Add rule versioning and immutable history for audit/legal traceability.
 88. Add support for time-bounded rule activation windows.
@@ -140,7 +140,7 @@ Current validation snapshot from this branch:
 102. Add one-time initialization guard with typed error return.
 103. Require admin auth in initialization flow for explicit ownership acceptance.
 104. Add validation that `valid_from <= valid_until` for attribute definitions.
-105. Add validation that attribute windows are not already expired at attachment time.
+
 106. Add explicit uniqueness strategy for `tag_id` namespace (global vs token-scoped).
 107. Add immutable revocation status flag instead of removing links only.
 108. Add revocation event emission with actor, reason, and timestamp.
@@ -163,7 +163,7 @@ Current validation snapshot from this branch:
 122. Remove or disable `record_event` panic stub and converge on single production entrypoint.
 123. Replace emitter self-declaration model with stronger caller provenance validation.
 124. Add one-time initialization guard returning error instead of panic.
-125. Add event payload size limits to avoid oversized persistent storage writes.
+
 126. Add canonical event type registry or namespace validation.
 127. Add stronger event ID construction (include nonce/index to avoid collisions).
 128. Add optional hash chaining between events for tamper-evident audit streams.
@@ -186,7 +186,7 @@ Current validation snapshot from this branch:
 142. Add project ID format validation and normalization rules.
 143. Add owner transfer guard against null/invalid destination addresses.
 144. Add duplicate CID protection per project version history.
-145. Add optional strict monotonic timestamp and anti-backdate checks.
+
 146. Add document type allowlist or policy hooks.
 147. Add event for project registration and ownership transfer.
 148. Add event for batch anchor summary in addition to per-document events.
@@ -207,7 +207,7 @@ Current validation snapshot from this branch:
 
 161. Implement actual `carbon_asset` mint integration (currently tracked as deferred in code comments).
 162. Require carbon asset contract to be configured before `mint_wrapped` execution.
-163. Validate `registry_credit_id` length/charset to prevent malformed leaf construction.
+
 164. Define and enforce canonical Merkle tree serialization spec shared with relayer.
 165. Include leaf position semantics in proof verification (currently ordering ignores `_leaf_index`).
 166. Add replay protection keyed by `(epoch_id, registry_credit_id)` with explicit invariants.
