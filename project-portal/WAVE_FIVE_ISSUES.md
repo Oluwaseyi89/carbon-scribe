@@ -503,7 +503,6 @@
 
 ### 🟠 Monitoring Components Wiring
 
-46. **Wire live health data to `SystemStatusBanner`** — The banner renders with hardcoded static status strings rather than consuming `detailedStatus` from the health Zustand slice.
 
 47. **Wire live uptime to `UptimeStatsCards`** — Uptime percentage cards display static mock values instead of data fetched from `fetchUptimeApi`.
 
