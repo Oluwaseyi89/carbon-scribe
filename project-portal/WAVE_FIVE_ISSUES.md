@@ -8,7 +8,6 @@
 
 ### 🔴 Monitoring Module (All Behind `//go:build future`)
 
-1. **Implement satellite data ingestion pipeline** — `internal/monitoring/ingestion/satellite.go` is gated with `//go:build future` and compiles to nothing, leaving the satellite data path entirely absent from the production binary.
 
 2. **Implement IoT sensor data ingestion endpoint** — `internal/monitoring/ingestion/iot.go` is a future build stub, meaning no IoT telemetry from field sensors is ever accepted or stored.
 
@@ -28,7 +27,7 @@
 
 10. **Wire alert notification dispatch** — `internal/monitoring/alerts/notifications.go` is future-gated and alerts never trigger any downstream delivery even if the engine were live.
 
-11. **Implement NDVI calculator** — `internal/monitoring/processing/ndvi_calculator.go` is future-gated and vegetation health scores are never computed from raw satellite imagery.
+
 
 12. **Implement biomass estimator** — `internal/monitoring/processing/biomass_estimator.go` is future-tagged and biomass data cannot be produced for credit verification.
 
@@ -40,11 +39,6 @@
 
 ### 🔴 Notifications Module (All Behind `//go:build future`)
 
-15. **Implement email notification channel** — `internal/notifications/channels/email.go` is a future build stub so the platform cannot send transactional email to users.
-
-16. **Implement SMS notification channel** — `internal/notifications/channels/sms.go` is future-gated, blocking SMS alert delivery to field managers in low-connectivity areas.
-
-17. **Implement WebSocket notification channel** — `internal/notifications/channels/websocket.go` is future-gated, preventing real-time in-app notification push to connected clients.
 
 18. **Build notification rules engine** — `internal/notifications/rules/engine.go` is future-tagged so no automated rules can trigger notifications from platform events.
 
@@ -72,11 +66,8 @@
 
 ### 🔴 Background Workers (All Behind `//go:build future`)
 
-29. **Implement satellite data sync worker** — `cmd/workers/satellite_worker.go` is future-gated so no scheduled satellite data pull refreshes project NDVI or biomass records.
 
-30. **Implement alert evaluation worker** — `cmd/workers/alert_worker.go` is future-gated and alerting runs only on ad-hoc HTTP triggers, not on a continuous polling schedule.
 
-31. **Implement billing worker** — `cmd/workers/billing_worker.go` is future-gated so subscription billing cycles and invoice generation never execute automatically.
 
 32. **Implement breach monitor worker** — `cmd/workers/breach_monitor.go` is future-gated and geofence breach detection is never evaluated on a continuous basis.
 
@@ -96,9 +87,7 @@
 
 ### 🔴 AWS Service Packages (All Behind `//go:build future`)
 
-39. **Implement AWS API Gateway management client** — `pkg/aws/apigateway.go` is a future build stub, blocking programmatic WebSocket message push via API Gateway.
 
-40. **Implement DynamoDB client** — `pkg/aws/dynamodb_client.go` is future-gated so WebSocket connection IDs and session state cannot be stored in DynamoDB.
 
 41. **Implement SES email delivery client** — `pkg/aws/ses_client.go` is future-gated and no transactional email can be sent via AWS Simple Email Service.
 
