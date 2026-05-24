@@ -426,11 +426,6 @@
 
 9. **Create developer project verification page** — `/developer/projects/[id]/verification/` directory exists with no `page.tsx`, blocking the verification workflow.
 
-10. **Add custom `not-found.tsx` page** — No 404 page exists; Next.js falls back to its unstyled framework default, breaking the brand experience.
-
-11. **Add `error.tsx` error boundary page** — No per-route `error.tsx` or global `global-error.tsx` is defined; unhandled render errors crash the entire application.
-
-12. **Add `loading.tsx` skeleton for portal root route** — No `loading.tsx` exists at the `(portal)` root, so navigations to the dashboard show a blank screen while data loads.
 
 13. **Create carbon credit marketplace page** — The sidebar links reference a marketplace but no route, layout, or page component exists for it.
 
@@ -456,12 +451,6 @@
 
 ### 🟠 State Management Gaps
 
-21. **Add financing slice to the unified Zustand store** — All financing state (credits, forward sales, payments) lives in local `useState` inside components with no shared global cache.
-
-22. **Add geospatial slice to the unified Zustand store** — Geospatial data (geometry, geofences, tiles) is fetched per-component on each mount with no global cache or deduplication.
-
-23. **Add notifications slice to the Zustand store** — No frontend notification state (unread count, notification list, dismiss handler) exists anywhere in the store.
-
 24. **Compose integrations slice into the main store** — The integrations slice lives in `store/` root but is not included in the main `lib/store/store.ts` composed store, creating a separate store instance.
 
 25. **Unify reports store with the main Zustand store** — `store/store.ts` exports `useReportsStore` as a separate Zustand instance from `lib/store/store.ts`, causing two independent React contexts.
@@ -480,15 +469,11 @@
 
 ### 🟠 API Client Issues
 
-31. **Add Authorization header to `reports.api.ts` fetch calls** — The reports store API uses raw `fetch` without attaching the JWT `Authorization: Bearer` header, causing all report endpoint calls to return 401.
 
 32. **Add Authorization header to `integration.api.ts` fetch calls** — The integration API similarly uses raw `fetch` without the auth header, leaving all integration CRUD endpoints unauthenticated from the frontend.
 
-33. **Add request timeout to Axios instance** — The configured Axios instance has no `timeout` value, allowing API requests to hang indefinitely on a slow or unresponsive backend.
 
 34. **Deduplicate concurrent identical API requests** — Multiple components mounting simultaneously issue the same API call without deduplication, creating redundant network traffic.
-
-35. **Add global error handler for 5xx API responses** — HTTP 500-level responses from the backend propagate as unhandled promise rejections that crash the nearest component boundary.
 
 36. **Validate that API base URL uses HTTPS in production builds** — No check prevents the `NEXT_PUBLIC_API_URL` from being an insecure `http://` URL in a production deployment.
 
