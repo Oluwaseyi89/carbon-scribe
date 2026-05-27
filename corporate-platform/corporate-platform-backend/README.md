@@ -283,6 +283,29 @@ If `idempotencyKey` is missing, the API returns an error. Duplicate requests wit
 
 See [test/ipfs-idempotency.e2e-spec.ts](test/ipfs-idempotency.e2e-spec.ts) for usage examples.
 
+## 🚀 Streaming Upload Support
+
+All upload endpoints now support streaming large files efficiently:
+
+- **Single Upload:**
+  - Endpoint: `/api/v1/ipfs/upload`
+  - Accepts a single file as multipart/form-data (field: `file`).
+  - File is streamed from disk to IPFS/Pinata, minimizing memory usage.
+  - Required field: `idempotencyKey` (string).
+
+- **Batch Upload:**
+  - Endpoint: `/api/v1/ipfs/batch/upload`
+  - Accepts multiple files as multipart/form-data (field: `files`).
+  - Each file must have a corresponding `idempotencyKey` (send as `idempotencyKeys[]` in the form body, order must match files array).
+  - Each file is streamed from disk to IPFS/Pinata.
+
+**Limitations:**
+- Maximum file size per upload is 1GB by default (configurable).
+- Antivirus scanning is not yet implemented for streams (see future roadmap).
+- If an upload is interrupted, partial files are cleaned up from disk.
+
+See code and tests for usage examples.
+
 ## 📁 Project Structure
 ```
 corporate-platform-backend/

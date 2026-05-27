@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import * as FormData from 'form-data';
 import axios from 'axios';
+import { createReadStream, unlink } from 'fs';
 import { IpfsConfig } from '../ipfs.config';
 import { PrismaService } from '../../shared/database/prisma.service';
 
@@ -27,10 +28,20 @@ export class UploadService {
       }
     }
     const form = new FormData();
-    form.append('file', file.buffer, {
-      filename: file.originalname,
-      contentType: file.mimetype,
-    });
+    if (file.path) {
+      form.append('file', createReadStream(file.path), {
+        filename: file.originalname,
+        contentType: file.mimetype,
+      });
+    } else if (file.buffer) {
+      // fallback for tests or non-streaming
+      form.append('file', file.buffer, {
+        filename: file.originalname,
+        contentType: file.mimetype,
+      });
+    } else {
+      return { error: 'No file data provided' };
+    }
     if (metadata) {
       form.append(
         'pinataMetadata',
@@ -66,10 +77,14 @@ export class UploadService {
           idempotencyKey: idempotencyKey || null,
         },
       });
+      // Clean up file after upload (if streaming)
+      if (file.path) {
+        unlink(file.path, () => {});
+      }
       return { cid, record };
     } catch (err) {
       this.logger.error('Pinata upload failed', err?.message || err);
-      // fallback: return mock CID based on buffer
+      // fallback: return mock CID based on buffer or file
       const cid = `mockcid-${Date.now()}`;
       const record = await this.prisma.ipfsDocument.create({
         data: {
@@ -87,34 +102,20 @@ export class UploadService {
           idempotencyKey: idempotencyKey || null,
         },
       });
+      if (file.path) {
+        unlink(file.path, () => {});
+      }
       return { cid, record, warning: 'pinning-failed-mock-cid' };
     }
   }
 
-  async batchUpload(
-    files: Array<{
-      fileName: string;
-      content: string;
-      idempotencyKey?: string;
-    }>,
-    metadata: any,
-  ) {
+  async batchUpload(files: any[], metadata: any) {
     const results = [];
-    for (const f of files) {
-      // create a buffer from base64 if provided
-      const buffer = Buffer.from(f.content || '', 'base64');
-      const fakeFile: any = {
-        originalname: f.fileName,
-        buffer,
-        size: buffer.length,
-        mimetype: 'application/octet-stream',
-      };
-      // Merge idempotencyKey for each file if present
-      const meta = { ...metadata };
-      if (f.idempotencyKey) meta.idempotencyKey = f.idempotencyKey;
-      // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-      // @ts-ignore
-      const res = await this.upload(fakeFile, meta);
+    const idempotencyKeys = metadata.idempotencyKeys || [];
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      const meta = { ...metadata, idempotencyKey: idempotencyKeys[i] };
+      const res = await this.upload(file, meta);
       results.push(res);
     }
     return results;
