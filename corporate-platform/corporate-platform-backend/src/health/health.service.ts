@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../shared/database/prisma.service';
 import { RedisService } from '../cache/redis.service';

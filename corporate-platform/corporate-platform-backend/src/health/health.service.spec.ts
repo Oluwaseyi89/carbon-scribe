@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { Test, TestingModule } from '@nestjs/testing';
 import { HealthService } from './health.service';
 import { PrismaService } from '../shared/database/prisma.service';
@@ -22,10 +21,7 @@ const mockedAxios = axios as any;
 describe('HealthService', () => {
   let service: HealthService;
   let prismaService: jest.Mocked<PrismaService>;
-  let redisService: jest.Mocked<RedisService>;
   let kafkaService: jest.Mocked<KafkaService>;
-  let ipfsConfig: jest.Mocked<IpfsConfig>;
-  let sorobanService: jest.Mocked<SorobanService>;
 
   const mockRedisClient = {
     ping: jest.fn(),
@@ -78,10 +74,7 @@ describe('HealthService', () => {
 
     service = module.get<HealthService>(HealthService);
     prismaService = module.get(PrismaService) as any;
-    redisService = module.get(RedisService) as any;
     kafkaService = module.get(KafkaService) as any;
-    ipfsConfig = module.get(IpfsConfig) as any;
-    sorobanService = module.get(SorobanService) as any;
   });
 
   afterEach(() => {

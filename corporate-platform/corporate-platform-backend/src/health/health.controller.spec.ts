@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { Test, TestingModule } from '@nestjs/testing';
 import { HealthController } from './health.controller';
 import { HealthService, ReadinessResponse } from './health.service';
@@ -9,7 +8,6 @@ import { Response } from 'express';
 declare const jest: any;
 declare const describe: any;
 declare const beforeEach: any;
-declare const afterEach: any;
 declare const it: any;
 declare const expect: any;
 
