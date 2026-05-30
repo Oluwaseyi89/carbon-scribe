@@ -127,8 +127,7 @@ fn validate_registry_credit_id(id: &String) -> Result<(), MerkleBridgeError> {
     let mut buf = [0u8; 64];
     id.copy_into_slice(&mut buf[..len as usize]);
 
-    for i in 0..len as usize {
-        let b = buf[i];
+    for &b in buf.iter().take(len as usize) {
         let allowed = matches!(b, b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_');
         if !allowed {
             return Err(MerkleBridgeError::CreditIdInvalidCharset);
@@ -166,11 +165,7 @@ impl MerkleBridge {
     ///
     /// # Returns
     /// * `Result<(), MerkleBridgeError>` - Success or error
-    pub fn initialize(
-        env: Env,
-        admin: Address,
-        updater: Address,
-    ) -> Result<(), MerkleBridgeError> {
+    pub fn initialize(env: Env, admin: Address, updater: Address) -> Result<(), MerkleBridgeError> {
         // Check if already initialized
         if env.storage().instance().has(&DataKey::Admin) {
             return Err(MerkleBridgeError::AlreadyInitialized);
@@ -292,12 +287,7 @@ impl MerkleBridge {
         }
         .publish(&env);
 
-        log!(
-            &env,
-            "Root updated for epoch {}: {:?}",
-            epoch_id,
-            root_hash
-        );
+        log!(&env, "Root updated for epoch {}: {:?}", epoch_id, root_hash);
 
         Ok(())
     }
@@ -557,7 +547,11 @@ impl MerkleBridge {
     }
 
     /// Compute the leaf hash: sha256(registry_credit_id || status)
-    fn compute_leaf_hash(env: &Env, registry_credit_id: &String, status: CreditStatus) -> BytesN<32> {
+    fn compute_leaf_hash(
+        env: &Env,
+        registry_credit_id: &String,
+        status: CreditStatus,
+    ) -> BytesN<32> {
         // Convert registry_credit_id to bytes
         let mut data = Bytes::new(env);
 
@@ -565,8 +559,8 @@ impl MerkleBridge {
         let id_len = registry_credit_id.len() as usize;
         let mut id_buffer = [0u8; 256]; // Max length buffer
         registry_credit_id.copy_into_slice(&mut id_buffer[..id_len]);
-        for i in 0..id_len {
-            data.push_back(id_buffer[i]);
+        for &b in id_buffer.iter().take(id_len) {
+            data.push_back(b);
         }
 
         // Append status bytes
@@ -986,7 +980,7 @@ mod tests {
         client.initialize(&admin, &updater);
 
         // Create 4-leaf tree
-        let ids = ["VER-001", "VER-002", "VER-003", "VER-004"];
+        let ids = ["VER-0001", "VER-0002", "VER-0003", "VER-0004"];
         let leaves: [BytesN<32>; 4] = [
             compute_test_leaf_hash(&env, ids[0]),
             compute_test_leaf_hash(&env, ids[1]),
@@ -1057,12 +1051,12 @@ mod tests {
 
         client.initialize(&admin, &updater);
 
-        let leaf_hash = compute_test_leaf_hash(&env, "VER-123");
+        let leaf_hash = compute_test_leaf_hash(&env, "VER-1234A");
         client.update_root(&updater, &1, &leaf_hash);
 
         // Try to mint with leaf_index too large for proof length
         let user = Address::generate(&env);
-        let registry_id = String::from_str(&env, "VER-123");
+        let registry_id = String::from_str(&env, "VER-1234A");
         let proof: Vec<BytesN<32>> = Vec::new(&env);
 
         // leaf_index = 1 but proof is empty (only supports index 0)
@@ -1096,7 +1090,10 @@ mod tests {
 
         let user = Address::generate(&env);
         // 65 chars — above maximum of 64
-        let long_id = String::from_str(&env, "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA-X");
+        let long_id = String::from_str(
+            &env,
+            "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA-X",
+        );
         let proof: Vec<BytesN<32>> = Vec::new(&env);
         client.mint_wrapped(&user, &long_id, &proof, &0, &1);
     }
