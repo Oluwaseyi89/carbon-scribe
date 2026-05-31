@@ -21,7 +21,7 @@
                   "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM"
                 },
                 {
-                  "u32": 1
+                  "u32": 5
                 },
                 {
                   "string": "PROJECT-001"
@@ -33,6 +33,8 @@
         }
       ]
     ],
+    [],
+    [],
     []
   ],
   "ledger": {
@@ -120,7 +122,7 @@
                   "symbol": "custody"
                 },
                 {
-                  "u32": 1
+                  "u32": 5
                 }
               ]
             },
@@ -140,7 +142,7 @@
                       "symbol": "custody"
                     },
                     {
-                      "u32": 1
+                      "u32": 5
                     }
                   ]
                 },
@@ -176,7 +178,7 @@
                         "symbol": "token_id"
                       },
                       "val": {
-                        "u32": 1
+                        "u32": 5
                       }
                     }
                   ]
