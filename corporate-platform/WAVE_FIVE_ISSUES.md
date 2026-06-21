@@ -447,23 +447,7 @@ The items below are intended as real production-readiness issues from the curren
 
 ## Backend Service: 150 Issues
 
-1. BE-001: Remove mock Pinata credential defaults from IPFS configuration
-   Replace permissive `mock-pinata-*` fallbacks with strict startup validation so the service cannot silently run with fake production storage credentials.
 
-2. BE-002: Remove mock CID persistence on IPFS upload failure
-   Stop writing fake CIDs into the database when pinning fails because this creates evidence records that look durable but are not retrievable from IPFS.
-
-3. BE-003: Add retry and backoff for Pinata upload operations
-   Harden IPFS interactions against transient timeouts and upstream instability before treating an upload as failed.
-
-4. BE-004: Add circuit breaker around IPFS provider failures
-   Prevent cascading request latency and repeated failed pin attempts when the storage provider is degraded.
-
-5. BE-005: Add dead-letter and recovery workflow for failed certificate anchoring
-   Persist actionable failure state so certificate uploads can be retried or repaired without manual database forensics.
-
-6. BE-006: Add durable pin verification after upload
-   Verify that uploaded IPFS content is actually retrievable from the configured gateway before marking it as pinned and production-safe.
 
 7. BE-007: Add background repinning strategy for vulnerable IPFS artifacts
    Periodically revalidate and repin important certificates so decentralized storage reliability improves beyond one upload attempt.
