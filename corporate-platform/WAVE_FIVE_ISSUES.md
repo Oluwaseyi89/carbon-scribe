@@ -6,36 +6,13 @@ The items below are intended as real production-readiness issues from the curren
 
 ## Frontend App: 150 Issues
 
-
-5. FE-005: Introduce request retry and backoff in the base API client
-   Add bounded retry behavior for transient network and 5xx failures so the UI does not fail immediately on recoverable outages.
-
-6. FE-006: Add structured client-side error reporting
-   Replace `console.error` calls in service code with a centralized telemetry sink that can forward actionable errors to an observability platform.
-
-7. FE-007: Add build-time environment validation for public config
-   Fail fast when `NEXT_PUBLIC_API_URL` or explorer configuration is missing or malformed instead of discovering it through runtime failures.
-
 8. FE-008: Align default frontend API base URL with backend local port conventions
    Reconcile the frontend fallback API URL with the backend's documented default port so local environments do not silently point to the wrong service.
 
 9. FE-009: Harden the app shell against hydration mismatches
    Audit theme, auth, and corporate context initialization so the root layout does not flash mismatched content between server and client render.
 
-10. FE-010: Add session-expiry UX for long-lived dashboard sessions
-   Show explicit countdown and re-auth flows when tokens are near expiry so users do not lose retirement or reporting work mid-action.
 
-11. FE-011: Add global offline and degraded-network indicator
-   Surface connectivity state in the shell so users understand when data may be stale or writes may be queued or failing.
-
-12. FE-012: Introduce fetch cancellation on route transitions
-   Cancel in-flight page and component requests when users navigate away so stale responses do not overwrite newer state.
-
-13. FE-013: Add race-condition protection for rapid filter changes
-   Guard marketplace, analytics, and document views against out-of-order responses when users quickly change filters or tabs.
-
-14. FE-014: Standardize API error envelope parsing
-   Make the client robust to backend error shape differences so pages do not display empty or misleading messages on non-standard failures.
 
 15. FE-015: Add secure handling for non-JSON API responses
    Protect the base API client from crashing when the backend returns HTML, empty bodies, file streams, or proxy error pages.
