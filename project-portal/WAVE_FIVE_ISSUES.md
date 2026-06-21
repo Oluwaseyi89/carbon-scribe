@@ -389,25 +389,11 @@
 
 ### 🔴 Empty / Stub Files (Zero Implementation)
 
-1. **Implement `carbonTokens.ts` Stellar SDK integration** — `src/lib/stellar/carbonTokens.ts` is a 0-byte empty file; no carbon token read or transfer functions exist on the frontend.
-
-2. **Implement `retirement.ts` on-chain retirement flow** — `src/lib/stellar/retirement.ts` is a 0-byte empty file; users cannot trigger or verify on-chain carbon credit retirement from the UI.
-
-3. **Implement Pinata IPFS client in `pinata.ts`** — `src/lib/ipfs/pinata.ts` is a 0-byte empty file; document pinning to IPFS is completely missing from the frontend.
-
-4. **Implement `TimeLapseViewer` component** — `src/components/maps/TimeLapseViewer.tsx` is a 0-byte empty file; the satellite time-lapse feature has no implementation at all.
-
-5. **Replace `CarbonMap` placeholder div with Mapbox GL implementation** — The map component renders a static `<div>` with a comment noting it is a placeholder for MapboxGL/Leaflet, without any real map library integrated.
-
-6. **Replace hard-coded mock data in `SatelliteInsights`** — NDVI score, biomass growth, canopy cover, and drought risk are static arrays instead of live data fetched from the backend.
 
 ---
 
 ### 🔴 Missing Pages / Routes
 
-7. **Create developer project financing page** — `/developer/projects/[id]/financing/` directory exists in the router with no `page.tsx`, returning a Next.js 404.
-
-8. **Create developer project monitoring page** — `/developer/projects/[id]/monitoring/` directory exists with no `page.tsx`, making the route inaccessible.
 
 9. **Create developer project verification page** — `/developer/projects/[id]/verification/` directory exists with no `page.tsx`, blocking the verification workflow.
 
