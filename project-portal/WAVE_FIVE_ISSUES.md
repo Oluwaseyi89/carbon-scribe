@@ -9,21 +9,6 @@
 ### 🔴 Monitoring Module (All Behind `//go:build future`)
 
 
-2. **Implement IoT sensor data ingestion endpoint** — `internal/monitoring/ingestion/iot.go` is a future build stub, meaning no IoT telemetry from field sensors is ever accepted or stored.
-
-3. **Implement webhook-based monitoring data ingestion** — `internal/monitoring/ingestion/webhook.go` is future-gated with no business logic, blocking third-party monitoring push integrations.
-
-4. **Build monitoring database repository** — `internal/monitoring/postgres_repository.go` is behind a future build tag so the monitoring module has no persistence layer whatsoever.
-
-5. **Implement monitoring metrics repository** — `postgres_repository_metrics.go` is future-tagged and no time-series metrics are ever written to the database.
-
-6. **Wire monitoring models to database migrations** — Monitoring model structs are future-gated and have no corresponding migration files, so the DB schema does not contain these tables.
-
-7. **Implement monitoring service layer** — `internal/monitoring/service.go` is a future build stub with no orchestration logic connecting ingestion, processing, and alerting.
-
-8. **Build and register monitoring HTTP handler** — `internal/monitoring/handler.go` is future-gated and is never added to the Gin router, leaving `/api/v1/monitoring` returning 404.
-
-9. **Implement alert engine** — `internal/monitoring/alerts/engine.go` is future-tagged so no alert evaluation rules are ever executed against incoming data.
 
 10. **Wire alert notification dispatch** — `internal/monitoring/alerts/notifications.go` is future-gated and alerts never trigger any downstream delivery even if the engine were live.
 
