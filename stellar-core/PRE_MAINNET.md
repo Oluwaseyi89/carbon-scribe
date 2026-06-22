@@ -74,7 +74,7 @@ Current validation snapshot from this branch:
 45. Add cross-contract transfer-in call to ensure custody is real, not metadata-only.
 
 47. Add TVL underflow/overflow protections using checked arithmetic.
-48. Add duplicate-token protection in `auto_deposit` path (same token deposited twice).
+
 49. Add replacement eligibility checks for `target_invalidated_token` before withdrawal.
 50. Add explicit mapping between replacement token and invalidated token for traceability.
 51. Add event for governance parameter changes (rate and governance address updates).
@@ -98,7 +98,7 @@ Current validation snapshot from this branch:
 66. Add revocation/suspension status field for methodology tokens.
 67. Add explicit historical validity checks rather than current-authority-only evaluation.
 68. Add authority validity windows (start/end timestamps).
-69. Add two-step authority add/remove governance flow with delay.
+
 70. Add event for admin initialization and authority list bootstrap.
 71. Add event for metadata updates and revocations.
 72. Add bounded authority list size and pagination methods.
@@ -121,7 +121,7 @@ Current validation snapshot from this branch:
 86. Add deterministic rule priority ordering to avoid first-match ambiguity.
 87. Add rule versioning and immutable history for audit/legal traceability.
 88. Add support for time-bounded rule activation windows.
-89. Add event emissions for add/update/deactivate rule lifecycle changes.
+
 90. Add event emissions for jurisdiction updates on addresses.
 91. Add pagination for active rule IDs and filtered rule retrieval.
 92. Add optimization for large rule sets (indexed match keys instead of linear scan).
@@ -149,7 +149,7 @@ Current validation snapshot from this branch:
 111. Add pagination for token attribute lists.
 112. Add issuer list bounds and pagination for `AllIssuers`.
 113. Add issuer add/remove events and governance audit trail.
-114. Add deterministic issuer authorization proof endpoint for off-chain engines.
+
 115. Add TTL extension policy for attributes and token links.
 116. Add tests for unauthorized issuer attach/revoke cases.
 117. Add tests for duplicate tag IDs and duplicate attachment attempts.
@@ -167,7 +167,7 @@ Current validation snapshot from this branch:
 126. Add canonical event type registry or namespace validation.
 127. Add stronger event ID construction (include nonce/index to avoid collisions).
 128. Add optional hash chaining between events for tamper-evident audit streams.
-129. Add retention strategy for `Events` and index TTL renewal.
+
 130. Add pruning/archive policy for large entity/type indexes.
 131. Add pagination for `get_events_by_contract` and `get_events_by_type_and_time`.
 132. Add filtered query support (time range, event type prefix, entity prefix).
@@ -192,7 +192,7 @@ Current validation snapshot from this branch:
 148. Add event for batch anchor summary in addition to per-document events.
 149. Add pagination endpoint for document history retrieval.
 150. Add pagination endpoint for projects by anchorer retrieval.
-151. Add deduplicated anchorer index compaction strategy.
+
 152. Add TTL extension policy for project owner and history state.
 153. Add batch size upper bound to prevent resource exhaustion.
 154. Add stronger CID validation including codec/multihash consistency checks.
@@ -218,7 +218,7 @@ Current validation snapshot from this branch:
 171. Add retention/TTL strategy for `MerkleRoot`, minted, and retired flags.
 172. Add pagination/query methods for bridged credits by epoch.
 173. Add events for failed proof attempts (optional rate-limited telemetry).
-174. Add benchmark tests for worst-case proof depth and budget usage.
+
 175. Add fuzz tests for hash ordering and proof validation edge cases.
 176. Add tests for empty proof + non-zero index and other malformed proof states.
 177. Add integration tests with external relayer artifact generation.
@@ -236,7 +236,7 @@ Current validation snapshot from this branch:
 186. Add bounded batch size for `batch_release` to avoid budget exhaustion.
 187. Add pagination for `get_all_locked` and `get_tokens_locked_until`.
 188. Add reverse index by owner for efficient owner-based lock queries.
-189. Add TTL extension policy for lock record map.
+
 190. Add event for admin/config updates (`set_admin`, `set_validate_vintage`).
 191. Add two-step admin transfer with acceptance flow.
 192. Add governance timelock before disabling vintage validation.
