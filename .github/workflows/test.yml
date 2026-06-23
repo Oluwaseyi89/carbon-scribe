@@ -24,10 +24,11 @@ jobs:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
-            target
+            stellar-core/verifiable-registry/target
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Execute Contract Unit & Benchmark Tests
         run: |
           # Captures stderr outputs along with verbose structural print maps
           cargo test -- --nocapture
+        working-directory: stellar-core/verifiable-registry
