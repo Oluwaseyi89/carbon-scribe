@@ -5,10 +5,10 @@ mod storage;
 mod types;
 mod validation;
 
-use events::emit_document_anchored_event;
+use events::{emit_anchorer_index_compacted_event, emit_document_anchored_event};
 use soroban_sdk::{contract, contractimpl, Address, Env, String, Vec};
 use storage::extend_instance_ttl;
-use types::{DocumentRecord, Error};
+use types::{CompactionConfig, DocumentRecord, Error, PaginatedProjects};
 use validation::validate_ipfs_cid;
 
 #[contract]
@@ -120,6 +120,9 @@ impl ProjectRegistry {
         // Update last recorded timestamp for monotonic enforcement
         storage::set_last_timestamp(&env, &project_id, timestamp);
 
+        // Track project's last document timestamp for pruning decisions
+        storage::set_project_last_document_timestamp(&env, &project_id, timestamp);
+
         // Update anchorer index
         let mut anchorer_projects =
             storage::get_anchorer_projects(&env, &owner).unwrap_or_else(|_| Vec::new(&env));
@@ -129,6 +132,9 @@ impl ProjectRegistry {
             anchorer_projects.push_back(project_id.clone());
             storage::set_anchorer_projects(&env, &owner, &anchorer_projects);
         }
+
+        // Check if auto-compaction should trigger after this write
+        storage::maybe_auto_compact(&env, &owner);
 
         // Emit event for off-chain indexing
         emit_document_anchored_event(&env, project_id, ipfs_cid, document_type, version_index);
@@ -200,6 +206,9 @@ impl ProjectRegistry {
         // Update last recorded timestamp for monotonic enforcement
         storage::set_last_timestamp(&env, &project_id, timestamp);
 
+        // Track project's last document timestamp for pruning decisions
+        storage::set_project_last_document_timestamp(&env, &project_id, timestamp);
+
         // Update anchorer index
         let mut anchorer_projects =
             storage::get_anchorer_projects(&env, &owner).unwrap_or_else(|_| Vec::new(&env));
@@ -208,6 +217,9 @@ impl ProjectRegistry {
             anchorer_projects.push_back(project_id.clone());
             storage::set_anchorer_projects(&env, &owner, &anchorer_projects);
         }
+
+        // Check if auto-compaction should trigger after this write
+        storage::maybe_auto_compact(&env, &owner);
 
         extend_instance_ttl(&env);
 
@@ -237,6 +249,61 @@ impl ProjectRegistry {
     /// Get all projects that an address has anchored documents for
     pub fn get_projects_by_anchorer(env: Env, anchorer: Address) -> Result<Vec<String>, Error> {
         storage::get_anchorer_projects(&env, &anchorer)
+    }
+
+    /// Get paginated projects by anchorer
+    pub fn get_anchorer_projects_page(
+        env: Env,
+        anchorer: Address,
+        cursor: Option<u32>,
+        page_size: Option<u32>,
+    ) -> PaginatedProjects {
+        storage::get_anchorer_projects_paginated(&env, &anchorer, cursor, page_size)
+    }
+
+    /// Get the current size of the anchorer index for a given address
+    pub fn get_anchorer_index_size(env: Env, anchorer: Address) -> u32 {
+        storage::get_anchorer_index_size(&env, &anchorer)
+    }
+
+    /// Get the compaction configuration
+    pub fn get_compaction_config(env: Env) -> CompactionConfig {
+        storage::get_compaction_config(&env)
+    }
+
+    /// Update the compaction configuration (admin only)
+    pub fn set_compaction_config(env: Env, config: CompactionConfig) -> Result<(), Error> {
+        let admin = storage::get_admin(&env)?;
+        admin.require_auth();
+
+        // Validate config parameters
+        if config.max_index_size == 0 {
+            return Err(Error::InvalidCompactionConfig);
+        }
+
+        storage::set_compaction_config(&env, &config);
+        extend_instance_ttl(&env);
+        Ok(())
+    }
+
+    /// Manually trigger compaction for all anchorers or a specific anchorer (admin only)
+    pub fn compact_anchorer_index(env: Env, anchorer: Address) -> Result<(), Error> {
+        let admin = storage::get_admin(&env)?;
+        admin.require_auth();
+
+        let stats = storage::compact_anchorer_index(&env, &anchorer);
+
+        // Emit compaction event for auditability
+        emit_anchorer_index_compacted_event(
+            &env,
+            anchorer,
+            stats.duplicates_removed,
+            stats.pruned_projects,
+            stats.remaining_projects,
+        );
+
+        extend_instance_ttl(&env);
+        Ok(())
     }
 
     /// Get the owner of a project
