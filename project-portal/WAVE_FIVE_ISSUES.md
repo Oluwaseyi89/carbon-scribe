@@ -214,13 +214,7 @@
 
 ### 🟡 Geospatial
 
-91. **Implement raster tile generation in the maps handler** — The tile endpoint proxies requests but does not perform actual raster tile rendering from PostGIS geometry.
 
-92. **Implement NDVI satellite overlay tile endpoint** — No endpoint serves generated NDVI raster tiles despite the frontend attempting to fetch them for map overlays.
-
-93. **Implement geofence breach detection and event emission** — The geofence worker is future-gated; boundaries are stored but no breach events are ever detected or fired.
-
-94. **Add PostGIS `GIST` spatial index in migration** — No `CREATE INDEX USING GIST` migration exists for the project geometry column, causing slow spatial intersection queries.
 
 ---
 
@@ -424,13 +418,7 @@
 
 24. **Compose integrations slice into the main store** — The integrations slice lives in `store/` root but is not included in the main `lib/store/store.ts` composed store, creating a separate store instance.
 
-25. **Unify reports store with the main Zustand store** — `store/store.ts` exports `useReportsStore` as a separate Zustand instance from `lib/store/store.ts`, causing two independent React contexts.
 
-26. **Implement automatic 401 token refresh in Axios interceptor** — The response interceptor logs 401 errors but does not automatically call `refreshSession` and retry the original request.
-
-27. **Add optimistic updates for task status changes in collaboration** — Toggling a task's status waits for the server round-trip before reflecting in the UI, creating noticeable lag.
-
-28. **Implement stale-while-revalidate pattern for project list** — Projects are refetched from scratch on every route navigation instead of serving cached data while refreshing in the background.
 
 29. **Persist `currentProjectId` across page reloads** — The selected project ID in the collaboration slice is in-memory only and cleared on page reload, requiring manual re-navigation.
 
