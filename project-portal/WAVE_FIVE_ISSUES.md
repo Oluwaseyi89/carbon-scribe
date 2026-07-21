@@ -170,8 +170,6 @@
 
 ### 🟠 Authentication
 
-75. **Add email verification step to registration flow** — Registered users are immediately set to active status without verifying email ownership.
-
 76. **Implement account lockout after repeated failed login attempts** — No brute-force protection exists; an attacker can attempt unlimited credential guesses without throttling.
 
 77. **Implement password reset request and confirm flow** — No password reset token creation or confirmation endpoint exists in the auth module.
@@ -184,11 +182,7 @@
 
 ### 🟠 Security Hardening
 
-80. **Add per-route rate limiting middleware** — No rate limiting is applied to any endpoint so a single IP can flood the login, minting, or payment APIs.
-
 81. **Enforce maximum request body size** — No `http.MaxBytesReader` or Gin body limit is set, enabling denial-of-service through arbitrarily large request payloads.
-
-82. **Validate uploaded document MIME type by content inspection** — MIME type is derived from the file extension rather than by reading magic bytes, enabling file type spoofing.
 
 83. **Add security response headers middleware** — No `Content-Security-Policy`, `X-Frame-Options`, `X-Content-Type-Options`, or `Strict-Transport-Security` headers are set on any response.
 
@@ -235,8 +229,6 @@
 ---
 
 ### 🟡 Collaboration
-
-101. **Add pagination to activity timeline list endpoint** — The activity timeline handler returns all records for a project with no `limit`/`offset`, risking OOM on high-activity projects.
 
 102. **Enforce maximum comment thread nesting depth** — Comment threads allow unlimited recursive nesting with no depth cap, enabling malformed data that can cause stack overflows in recursive renderers.
 
@@ -442,7 +434,6 @@
 
 ### 🟠 Authentication UI
 
-38. **Implement email verification prompt after registration** — Successful registration redirects immediately to the portal without displaying any email verification prompt or holding the session.
 
 39. **Add password strength indicator to registration form** — The registration form accepts passwords of any length with no visual strength meter or minimum complexity feedback.
 
@@ -462,8 +453,6 @@
 
 ### 🟠 Monitoring Components Wiring
 
-
-47. **Wire live uptime to `UptimeStatsCards`** — Uptime percentage cards display static mock values instead of data fetched from `fetchUptimeApi`.
 
 48. **Wire live service data to `ComponentStatusGrid`** — The grid renders placeholder tiles without calling `fetchServicesApi` or binding to the `services` slice state.
 
@@ -503,7 +492,6 @@
 
 ### 🟠 Financing Components Wiring
 
-65. **Implement `PaymentManagement` component with live API** — The payment management UI renders form fields but makes no API calls for payment history listing, initiation, or status updates.
 
 66. **Add real-time status polling to `TokenizationStatus`** — Minting status is updated only on manual refresh; no interval polling or WebSocket subscription tracks in-progress minting jobs.
 
@@ -515,7 +503,6 @@
 
 ### 🟠 Reports Components Wiring
 
-69. **Trigger `fetchReports` on `ReportsList` mount** — The reports list renders empty without calling the `listReports` action on component mount.
 
 70. **Submit sharing permissions from `ReportSharing` to API** — The sharing modal renders checkboxes for roles but clicking save does not call any API endpoint to persist the permissions.
 
