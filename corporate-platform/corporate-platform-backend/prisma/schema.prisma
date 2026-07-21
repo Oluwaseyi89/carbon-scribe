@@ -56,6 +56,9 @@ model Company {
   // SBTi
   sbtiTargets            SbtiTarget[]
 
+  // Contract Calls (add this line)
+  contractCalls          ContractCall[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -1386,15 +1389,44 @@ model ContractCall {
   methodName      String
   transactionHash String    @unique
   args            Json
-  status          String // PENDING, CONFIRMED, FAILED
+  status          String // PENDING, CONFIRMED, FAILED, DUPLICATE
   result          Json?
   submittedAt     DateTime  @default(now())
   confirmedAt     DateTime?
 
+  // Idempotency & Deduplication Fields
+  workflowId      String?   @map("workflow_id") // Business workflow ID (e.g., retirement-123, mint-456)
+  idempotencyKey  String?   @unique @map("idempotency_key") // Client-provided idempotency key
+  deduplicationKey String?  @unique @map("deduplication_key") // Computed key: workflowId + methodName
+  originalCallId  String?   @map("original_call_id") // Reference to the original call in case of duplicate
+  isDuplicate     Boolean   @default(false) @map("is_duplicate")
+  duplicateReason String?   @map("duplicate_reason") // Reason for marking as duplicate
+
+  // Retry tracking
+  retryCount      Int       @default(0)
+  maxRetries      Int       @default(3)
+  lastRetryAt     DateTime?
+  nextRetryAt     DateTime?
+  errorMessage    String?
+
+  // Metadata
+  metadata        Json?     // Additional context
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  // Relations
+  company Company @relation(fields: [companyId], references: [id])
+
+  // Composite indexes for querying
   @@index([companyId])
   @@index([contractId])
   @@index([status])
   @@index([submittedAt])
+  @@index([workflowId])
+  @@index([idempotencyKey])
+  @@index([deduplicationKey])
+  @@index([status, nextRetryAt])
+  @@index([companyId, workflowId])
   @@map("contract_calls")
 }
 

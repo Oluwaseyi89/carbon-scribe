@@ -22,6 +22,7 @@ import (
 	"carbon-scribe/project-portal/project-portal-backend/internal/health"
 	"carbon-scribe/project-portal/project-portal-backend/internal/integration"
 	integrationstellar "carbon-scribe/project-portal/project-portal-backend/internal/integration/stellar"
+	"carbon-scribe/project-portal/project-portal-backend/internal/monitoring"
 	"carbon-scribe/project-portal/project-portal-backend/internal/notifications"
 	"carbon-scribe/project-portal/project-portal-backend/internal/notifications/channels"
 	"carbon-scribe/project-portal/project-portal-backend/internal/project"
@@ -29,13 +30,14 @@ import (
 	"carbon-scribe/project-portal/project-portal-backend/internal/project/methodology"
 	"carbon-scribe/project-portal/project-portal-backend/internal/project/quality"
 	"carbon-scribe/project-portal/project-portal-backend/internal/reports"
-	"carbon-scribe/project-portal/project-portal-backend/pkg/aws"
 	"carbon-scribe/project-portal/project-portal-backend/internal/search"
 	"carbon-scribe/project-portal/project-portal-backend/internal/seed"
 	"carbon-scribe/project-portal/project-portal-backend/internal/settings"
+	"carbon-scribe/project-portal/project-portal-backend/pkg/aws"
 	"carbon-scribe/project-portal/project-portal-backend/pkg/elastic"
 	"carbon-scribe/project-portal/project-portal-backend/pkg/storage"
 
+	api "carbon-scribe/project-portal/project-portal-backend/api/v1"
 	"carbon-scribe/project-portal/project-portal-backend/internal/project/validation"
 
 	"github.com/gin-gonic/gin"
@@ -237,6 +239,21 @@ func main() {
 	inventoryHandler := inventory.NewHandler(inventoryService)
 	log.Println("✅ Credit inventory service initialized")
 
+	// ============================================================================
+	// Initialize Monitoring Service
+	// ============================================================================
+
+	// Get sql.DB from GORM for monitoring repository
+	sqlDB, err := db.DB()
+	if err != nil {
+		log.Fatalf("❌ Failed to get underlying SQL DB for monitoring: %v", err)
+	}
+
+	monitoringRepo := monitoring.NewPostgresRepository(sqlDB)
+	monitoringService := monitoring.NewService(monitoringRepo)
+	monitoringHandler := api.NewMonitoringHandler(monitoringService)
+	log.Println("✅ Monitoring service initialized")
+
 	// Setup Gin
 	if !cfg.Debug {
 		gin.SetMode(gin.ReleaseMode)
@@ -254,7 +271,7 @@ func main() {
 			"service":   "carbon-scribe-project-portal",
 			"timestamp": time.Now().Format(time.RFC3339),
 			"version":   "1.0.0",
-			"modules":   []string{"auth", "collaboration", "documents", "integration", "reports", "search", "geospatial", "settings", "financing", "inventory", "notifications"},
+			"modules":   []string{"auth", "collaboration", "documents", "integration", "reports", "search", "geospatial", "settings", "financing", "inventory", "notifications", "monitoring"},
 		})
 	})
 
@@ -277,6 +294,7 @@ func main() {
 				"financing":     "/api/v1/financing/*",
 				"inventory":     "/api/v1/projects/:id/inventory/*",
 				"notifications": "/api/v1/notifications/*",
+				"monitoring":    "/api/v1/monitoring/*",
 			},
 		})
 	})
@@ -328,6 +346,11 @@ func main() {
 		financingHandler.RegisterRoutes(v1)
 		mintingHandler.RegisterRoutes(v1)
 
+		// ============================================================================
+		// Register Monitoring Routes under v1
+		// ============================================================================
+		api.RegisterMonitoringRoutes(v1, monitoringHandler)
+
 		// Ping endpoint for testing
 		v1.GET("/ping", func(c *gin.Context) {
 			c.JSON(http.StatusOK, gin.H{"message": "pong", "timestamp": time.Now().Unix()})
@@ -365,6 +388,7 @@ func main() {
 		fmt.Println("   - Settings: /api/v1/settings/*")
 		fmt.Println("   - Financing: /api/v1/financing/*")
 		fmt.Println("   - Notifications: /api/v1/notifications/*")
+		fmt.Println("   - Monitoring: /api/v1/monitoring/*")
 
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("❌ Server failed to start: %v", err)

@@ -30,4 +30,36 @@ export class IpfsConfig {
   get timeout(): number {
     return this.configService.get<number>('PINATA_TIMEOUT_MS');
   }
+
+  get retryMaxAttempts(): number {
+    return this.configService.get<number>('PINATA_RETRY_MAX_ATTEMPTS');
+  }
+
+  get retryInitialDelayMs(): number {
+    return this.configService.get<number>('PINATA_RETRY_INITIAL_DELAY_MS');
+  }
+
+  get retryMaxDelayMs(): number {
+    return this.configService.get<number>('PINATA_RETRY_MAX_DELAY_MS');
+  }
+
+  get retryBackoffMultiplier(): number {
+    return this.configService.get<number>('PINATA_RETRY_BACKOFF_MULTIPLIER');
+  }
+
+  get verifyRetryAttempts(): number {
+    return this.configService.get<number>('PINATA_VERIFY_RETRY_ATTEMPTS', 3);
+  }
+
+  get verifyRetryDelayMs(): number {
+    return this.configService.get<number>('PINATA_VERIFY_RETRY_DELAY_MS', 1000);
+  }
+
+  get verifyTimeoutMs(): number {
+    return (
+      this.configService.get<number>('PINATA_VERIFY_TIMEOUT_MS') ||
+      this.timeout ||
+      10000
+    );
+  }
 }
