@@ -9,19 +9,10 @@ The items below are intended as real production-readiness issues from the curren
 8. FE-008: Align default frontend API base URL with backend local port conventions
    Reconcile the frontend fallback API URL with the backend's documented default port so local environments do not silently point to the wrong service.
 
-9. FE-009: Harden the app shell against hydration mismatches
-   Audit theme, auth, and corporate context initialization so the root layout does not flash mismatched content between server and client render.
-
-
-
-15. FE-015: Add secure handling for non-JSON API responses
-   Protect the base API client from crashing when the backend returns HTML, empty bodies, file streams, or proxy error pages.
 
 16. FE-016: Implement security headers in Next.js config
    Add CSP, HSTS, X-Frame-Options, Referrer-Policy, and related headers to reduce exposure to common browser-side attacks.
 
-17. FE-017: Add static asset and API caching strategy to Next config
-   Define cache headers and revalidation rules so the application performs predictably behind a CDN in production.
 
 18. FE-018: Replace default Google font choice with a more controllable production typography stack
    Review the current root font setup so rendering, licensing, performance, and brand consistency are predictable across environments.
@@ -32,17 +23,6 @@ The items below are intended as real production-readiness issues from the curren
 20. FE-020: Add favicon, manifest, and PWA metadata completeness pass
    Complete browser metadata and installability details so enterprise users get a polished experience on managed devices.
 
-21. FE-021: Add accessibility audit for keyboard navigation across the shell
-   Verify sidebar, top navigation, dialogs, tabs, and action menus are fully operable without a mouse.
-
-22. FE-022: Add accessibility audit for color contrast in light and dark themes
-   Review current palette usage so charts, badges, text, and disabled states meet WCAG contrast requirements.
-
-23. FE-023: Add screen-reader labels for icon-only actions
-   Audit buttons and controls that currently rely on icons so assistive technology users can understand destructive and primary actions.
-
-24. FE-024: Improve focus management for modal and drawer workflows
-   Trap focus correctly and restore it after close so multi-step retirement and document flows remain accessible.
 
 25. FE-025: Add aria-live feedback for long-running actions
    Provide assistive announcements for uploads, retirement requests, report generation, and auction bids so status changes are not silent.
@@ -422,6 +402,9 @@ The items below are intended as real production-readiness issues from the curren
 150. FE-150: Add production-readiness review for the entire web information architecture
    Reassess navigation, module discoverability, and task grouping so the platform scales from demo breadth to enterprise operational clarity.
 
+
+
+
 ## Backend Service: 150 Issues
 
 
@@ -440,9 +423,6 @@ The items below are intended as real production-readiness issues from the curren
 
 18. BE-018: Remove `dev-jwt-secret` fallback from tenant token utilities
    Align multi-tenant token verification with the same strict secret requirements used by core auth flows.
-
-19. BE-019: Enforce environment-specific startup validation rules
-   Make production startup fail when critical values like database, Kafka, Stellar, and IPFS credentials are absent or clearly placeholder values.
 
 20. BE-020: Add explicit placeholder-secret detection across config
    Reject values like demo passwords, mock keys, and local bypass tokens during deployment validation.
@@ -463,30 +443,12 @@ The items below are intended as real production-readiness issues from the curren
    Protect the service from oversized payloads and accidental memory exhaustion during uploads and bulk operations.
 
 
-
-27. BE-027: Add rate limiting for authentication endpoints
-   Protect login, refresh, register, and password-reset flows from brute-force and credential-stuffing patterns.
-
-28. BE-028: Add rate limiting for marketplace bidding and retirement submission
-   Prevent accidental or malicious rapid-fire writes on sensitive financial and irreversible endpoints.
-
-29. BE-029: Add idempotency keys for retirement operations
-   Ensure retried retirement requests cannot create duplicate or ambiguous records when network failures occur after submission.
-
 30. BE-030: Add idempotency keys for order checkout and payment-adjacent flows
    Prevent duplicated orders or downstream processing when clients repeat uncertain purchase operations.
 
 31. BE-031: Add correlation IDs to every inbound request and emitted event
    Propagate one traceable identifier across APIs, jobs, and webhooks so production debugging becomes practical.
 
-32. BE-032: Add structured JSON logging with domain context fields
-   Include tenant, user, route, request ID, and workflow stage in logs so observability extends beyond plain message strings.
-
-33. BE-033: Add centralized exception mapping for domain errors
-   Convert thrown service errors into consistent API responses so clients receive stable status codes and machine-readable error bodies.
-
-34. BE-034: Add global timeout and cancellation policies for upstream calls
-   Ensure Redis, Kafka, Pinata, and Stellar interactions cannot hang request handlers indefinitely.
 
 35. BE-035: Add OpenTelemetry or equivalent distributed tracing
    Trace requests through HTTP, Prisma, Kafka, and external services so latency hotspots can be measured instead of guessed.
@@ -515,8 +477,6 @@ The items below are intended as real production-readiness issues from the curren
 44. BE-044: Add event versioning policy across Kafka topics
    Formalize schema evolution so consumers do not break silently as domain payloads change over time.
 
-45. BE-045: Add schema validation for emitted event payloads
-   Validate domain events before publication so downstream consumers do not ingest malformed or incomplete data.
 
 46. BE-046: Add consumer lag and DLQ monitoring
    Surface topic lag and dead-letter growth so event bus health can be managed proactively.
