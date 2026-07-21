@@ -22,7 +22,6 @@ Current validation snapshot from this branch:
 ## Carbon Asset (20 issues)
 
 1. Replace generic `InvalidStatusTransition` usage for amount/ledger validation with dedicated SEP-41 input errors.
-2. Add explicit max supply / mint cap controls to prevent unbounded token issuance.
 3. Add input bounds validation for metadata fields (length and format constraints).
 4. Enforce methodology validation on mint via cross-contract call to `methodology_library`.
 5. Add optional requirement that `methodology_id` must exist before mint completion.
@@ -44,7 +43,6 @@ Current validation snapshot from this branch:
 
 ## Retirement Tracker (20 issues)
 
-21. Replace `panic!("Contract already initialized")` with typed contract error.
 22. Add validation for `token_id > 0` and reject invalid IDs with explicit errors.
 
 24. Validate burn call return/error surface from `carbon_asset` and map to `BurnFailed`.
@@ -68,7 +66,6 @@ Current validation snapshot from this branch:
 ## Buffer Pool (20 issues)
 
 41. Require auth on `initialize` caller path and enforce admin/governance signer checks.
-42. Add guard against `percentage = 0` in `auto_deposit` to prevent modulo-by-zero panic.
 43. Enforce non-zero governance and carbon contract addresses at initialization.
 44. Add validation that deposited token actually exists and is custodied by pool contract.
 45. Add cross-contract transfer-in call to ensure custody is real, not metadata-only.
@@ -113,7 +110,6 @@ Current validation snapshot from this branch:
 
 ## Regulatory Checks (20 issues)
 
-81. Add one-time initialization guard (currently can overwrite admin/governance).
 82. Replace all `unwrap()` governance/admin retrievals with typed initialization errors.
 83. Add validation that carbon asset contract address is non-zero and contract account.
 84. Add explicit rule schema validation (non-empty IDs, field length caps, enum consistency).
@@ -136,7 +132,6 @@ Current validation snapshot from this branch:
 
 ## Tax Attribute (20 issues)
 
-101. Replace all `panic!` auth and validation paths with structured contract errors.
 102. Add one-time initialization guard with typed error return.
 103. Require admin auth in initialization flow for explicit ownership acceptance.
 104. Add validation that `valid_from <= valid_until` for attribute definitions.
@@ -161,7 +156,6 @@ Current validation snapshot from this branch:
 
 121. Replace all `panic!` branches with typed errors for deterministic client handling.
 122. Remove or disable `record_event` panic stub and converge on single production entrypoint.
-123. Replace emitter self-declaration model with stronger caller provenance validation.
 124. Add one-time initialization guard returning error instead of panic.
 
 126. Add canonical event type registry or namespace validation.
@@ -184,7 +178,6 @@ Current validation snapshot from this branch:
 
 141. Add max project count / quota strategy to protect storage growth.
 142. Add project ID format validation and normalization rules.
-143. Add owner transfer guard against null/invalid destination addresses.
 144. Add duplicate CID protection per project version history.
 
 146. Add document type allowlist or policy hooks.
