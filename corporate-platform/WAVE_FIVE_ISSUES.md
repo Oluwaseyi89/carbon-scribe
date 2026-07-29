@@ -78,8 +78,6 @@ The items below are intended as real production-readiness issues from the curren
 42. FE-042: Add typed response guards for critical service contracts
    Validate high-value backend responses at runtime so malformed payloads do not corrupt dashboard state or charts.
 
-43. FE-043: Add pagination and virtualization for large data tables
-   Prevent browser slowdowns when portfolios, audit events, transfers, or documents grow beyond demo-scale volumes.
 
 44. FE-044: Add server-driven sorting support in list-heavy modules
    Avoid sorting large datasets entirely in the client so production performance remains stable as records grow.
@@ -156,8 +154,6 @@ The items below are intended as real production-readiness issues from the curren
 68. FE-068: Add deduplication for real-time feed events
    Prevent repeated live retirement items when reconnects or backend retries replay the same event more than once.
 
-69. FE-069: Add explicit on-chain confirmation states in transfer UI
-   Distinguish submitted, pending, confirmed, and failed blockchain actions so users can understand where a transaction is stuck.
 
 70. FE-070: Add explorer-link validation in Stellar transfer views
    Ensure on-chain links are correct for the configured network so users do not open the wrong testnet or mainnet explorer pages.
@@ -183,8 +179,6 @@ The items below are intended as real production-readiness issues from the curren
 77. FE-077: Add explicit handling for simulated versus on-chain retirement states
    Differentiate simulation-only backend responses from fully anchored retirements so compliance users do not over-trust provisional records.
 
-78. FE-078: Add confirmation summary before irreversible retirement
-   Present wallet, amount, beneficiary, reason, and reporting impact in one review step before users commit a retirement action.
 
 79. FE-079: Add duplicate-retirement prevention in the client
    Lock the form and debounce repeated submits so double-clicks do not create conflicting or duplicate retirement requests.
@@ -493,8 +487,6 @@ The items below are intended as real production-readiness issues from the curren
 50. BE-050: Document degraded-mode behavior when Kafka is intentionally disabled
    Make it clear which features continue, which queue, and which fail so operators and frontend developers can plan appropriately.
 
-51. BE-051: Harden Soroban invocation flows against partial submission states
-   Handle the case where transaction submission times out but later lands on-chain so retirement status remains accurate.
 
 52. BE-052: Add explicit distinction between simulated and on-chain contract calls in domain workflows
    Prevent business logic from treating simulated contract execution as equivalent to immutable blockchain confirmation.
@@ -581,8 +573,6 @@ The items below are intended as real production-readiness issues from the curren
 80. BE-080: Add row-level access tests for multi-tenant data boundaries
    Prove through integration tests that every sensitive query enforces company isolation under realistic request paths.
 
-81. BE-081: Remove controller-level mock user fallbacks from production code paths
-   Eliminate code that substitutes `mock-user-id` and `mock-company-id` when authentication context is absent.
 
 82. BE-082: Add system-wide authorization audit for every controller action
    Verify that all routes consistently enforce JWT, API key, RBAC, and tenant guards where appropriate.
@@ -659,8 +649,6 @@ The items below are intended as real production-readiness issues from the curren
 106. BE-106: Add provenance checks for marketplace listings entering retirement workflows
    Verify the credit lineage and availability still hold at retirement time instead of assuming marketplace data stayed unchanged.
 
-107. BE-107: Add inventory reservation semantics across cart, order, and retirement flows
-   Prevent overselling or double-retiring the same available credit inventory under concurrent activity.
 
 108. BE-108: Add strong consistency guarantees for availability deductions
    Use transactions or locking patterns so concurrent purchases and retirements cannot produce negative or duplicated balances.

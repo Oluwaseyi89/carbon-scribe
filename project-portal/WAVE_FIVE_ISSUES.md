@@ -90,7 +90,6 @@
 
 ### 🟠 Minting & Tokenization
 
-47. **Remove mock contract client from production mint path** — `minting/service.go` falls back to `mockContractClient` when no admin private key is configured, silently producing fake token IDs in production.
 
 48. **Replace placeholder owner Stellar address in minting** — A literal comment "placeholder address for demonstration" is used as the token recipient instead of the project's registered Stellar wallet address.
 
@@ -134,7 +133,6 @@
 
 ### 🟠 Compliance & GDPR
 
-63. **Implement GDPR deletion request processor** — Deletion requests are accepted and stored but no background job ever executes the anonymization or hard deletion of user data.
 
 64. **Implement GDPR data export pipeline** — Export requests are persisted but no process generates the JSON/CSV data package and delivers it to the requesting user.
 
@@ -246,7 +244,6 @@
 
 107. **Export business KPI metrics via OpenTelemetry** — No custom counters or histograms track credits minted, payments processed, or users registered for operational monitoring.
 
-108. **Add real dependency health checks to the `/health` endpoint** — The health endpoint reports `"status": "healthy"` unconditionally without probing DB, Elasticsearch, or MongoDB connectivity.
 
 109. **Add a `/metrics` Prometheus endpoint** — No metrics scrape endpoint exists for infrastructure monitoring tools to collect request rates or latencies.
 
@@ -474,7 +471,6 @@
 
 57. **Fix `MetricSelector` to re-render chart on selection change** — Selecting a metric updates component-local state but the parent chart does not observe the change and re-render.
 
-58. **Implement `ChartExport` download handler** — The export button has an `onClick` handler that logs a "not implemented" message instead of converting the chart to an image.
 
 59. **Wire `DependencyGraph` to live dependency data** — The graph renders static example nodes instead of the `dependencies` array returned by `fetchDependenciesApi`.
 
@@ -510,7 +506,6 @@
 
 72. **Wire `ScheduleForm` submit to report scheduling API action** — The form submits locally but the API call to `apiCreateSchedule` is never dispatched through the reports store.
 
-73. **Add server-side pagination to `DatasetExplorer` table** — The dataset table renders all returned rows with no pagination controls, causing the DOM to bloat for large datasets.
 
 74. **Implement export file download handler in `ExecutionHistory`** — The download icon in each execution row dispatches no API call to retrieve the output file from the backend.
 
@@ -538,7 +533,6 @@
 
 ### 🟠 Map / Geospatial Components
 
-83. **Integrate Mapbox GL JS SDK into `CarbonMap`** — The Mapbox GL library is not installed in `package.json`, making it impossible to render an interactive map without adding the dependency and implementation.
 
 84. **Add GeoJSON polygon drawing tool to `CarbonMap`** — No draw control exists for users to define project land boundaries on the map interactively.
 

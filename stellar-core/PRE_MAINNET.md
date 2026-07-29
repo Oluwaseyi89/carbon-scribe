@@ -31,7 +31,6 @@ Current validation snapshot from this branch:
 9. Add invariant test ensuring burned tokens can never reappear in owner token lists.
 10. Add dedicated tests for all rejected status transitions (full transition matrix).
 11. Add dedicated tests for compliance hook failure paths (contract missing, malformed response).
-12. Handle external compliance contract invocation failures with deterministic contract errors.
 13. Add transfer throttling / circuit-breaker switch for emergency governance response.
 14. Add two-step admin transfer (propose/accept) instead of immediate reassignment.
 15. Add multisig-compatible admin model (role split for mint/config/oracle actions).
@@ -48,7 +47,6 @@ Current validation snapshot from this branch:
 24. Validate burn call return/error surface from `carbon_asset` and map to `BurnFailed`.
 25. Add explicit cross-contract interface checks during initialization (method existence sanity).
 26. Add duplicate retirement prevention test across `retire` and `batch_retire` interleavings.
-27. Add failure reporting in `batch_retire` (currently silently drops failed entries).
 28. Add batch upper bound to prevent resource exhaustion on very large token arrays.
 29. Add event for failed retirement attempts to improve auditability.
 30. Add index compaction/cleanup strategy for very large `EntityIndex` vectors.
@@ -110,7 +108,6 @@ Current validation snapshot from this branch:
 
 ## Regulatory Checks (20 issues)
 
-82. Replace all `unwrap()` governance/admin retrievals with typed initialization errors.
 83. Add validation that carbon asset contract address is non-zero and contract account.
 84. Add explicit rule schema validation (non-empty IDs, field length caps, enum consistency).
 
@@ -126,7 +123,6 @@ Current validation snapshot from this branch:
 95. Add cleanup and TTL extension strategy for pending approvals.
 96. Add tests for `record_authorization` expiry boundary conditions.
 97. Add tests for no-matching-rule policy behavior under production config.
-98. Add full unit tests (currently zero tests for this contract).
 99. Add integration tests with `carbon_asset.before_transfer` and retirement flows.
 100. Add governance timelock and multisig requirement for rule changes on mainnet.
 
@@ -154,8 +150,6 @@ Current validation snapshot from this branch:
 
 ## Audit Trail (20 issues)
 
-121. Replace all `panic!` branches with typed errors for deterministic client handling.
-122. Remove or disable `record_event` panic stub and converge on single production entrypoint.
 124. Add one-time initialization guard returning error instead of panic.
 
 126. Add canonical event type registry or namespace validation.
@@ -198,7 +192,6 @@ Current validation snapshot from this branch:
 
 ## Merkle Bridge (20 issues)
 
-161. Implement actual `carbon_asset` mint integration (currently tracked as deferred in code comments).
 162. Require carbon asset contract to be configured before `mint_wrapped` execution.
 
 164. Define and enforce canonical Merkle tree serialization spec shared with relayer.
@@ -223,7 +216,6 @@ Current validation snapshot from this branch:
 
 
 182. Add unit/integration tests (currently zero tests for this contract).
-183. Verify token transfer semantics: token ID should not be treated as fungible amount via SEP-41 client.
 184. Integrate with NFT-style transfer interface if required by `carbon_asset` ownership model.
 185. Add explicit ownership pre-check before lock transfer call.
 186. Add bounded batch size for `batch_release` to avoid budget exhaustion.
