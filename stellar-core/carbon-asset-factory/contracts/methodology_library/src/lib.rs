@@ -1,7 +1,7 @@
 #![no_std]
 #![allow(deprecated)]
 use soroban_sdk::{
-    contract, contracterror, contractimpl, contracttype, symbol_short, Address, Env, String, Vec,
+    contract, contracterror, contractimpl, contracttype, symbol_short, Address, Bytes, Env, String, Vec,
 };
 
 #[contracterror]
@@ -17,6 +17,12 @@ pub enum Error {
     ProposalNotFound = 8,
     DelayNotMet = 9,
     ProposalAlreadyExists = 10,
+    // Validation errors (11-15)
+    InvalidName = 11,
+    InvalidVersion = 12,
+    InvalidRegistryLink = 13,
+    InvalidRegistry = 14,
+    MetadataTooLong = 15,
 }
 
 #[contracttype]
@@ -85,8 +91,122 @@ impl MethodologyLibrary {
         Ok(())
     }
 
+    fn validate_metadata(_env: &Env, meta: &MethodologyMeta) -> Result<(), Error> {
+        // Validate name: non-empty, not whitespace-only, max 100 chars
+        if meta.name.len() == 0 {
+            return Err(Error::InvalidName);
+        }
+        if meta.name.len() > 100 {
+            return Err(Error::MetadataTooLong);
+        }
+        if Self::is_whitespace_only(&meta.name.to_bytes()) {
+            return Err(Error::InvalidName);
+        }
+
+        // Validate version: non-empty, semver format (x.y.z), max 20 chars
+        if meta.version.len() == 0 {
+            return Err(Error::InvalidVersion);
+        }
+        if meta.version.len() > 20 {
+            return Err(Error::MetadataTooLong);
+        }
+        if Self::is_whitespace_only(&meta.version.to_bytes()) {
+            return Err(Error::InvalidVersion);
+        }
+        if !Self::validate_semver(&meta.version.to_bytes()) {
+            return Err(Error::InvalidVersion);
+        }
+
+        // Validate registry: non-empty, max 50 chars
+        if meta.registry.len() == 0 {
+            return Err(Error::InvalidRegistry);
+        }
+        if meta.registry.len() > 50 {
+            return Err(Error::MetadataTooLong);
+        }
+        if Self::is_whitespace_only(&meta.registry.to_bytes()) {
+            return Err(Error::InvalidRegistry);
+        }
+
+        // Validate registry_link: non-empty, valid URL, max 255 chars
+        if meta.registry_link.len() == 0 {
+            return Err(Error::InvalidRegistryLink);
+        }
+        if meta.registry_link.len() > 255 {
+            return Err(Error::MetadataTooLong);
+        }
+        if Self::is_whitespace_only(&meta.registry_link.to_bytes()) {
+            return Err(Error::InvalidRegistryLink);
+        }
+        if !Self::is_valid_url(&meta.registry_link.to_bytes()) {
+            return Err(Error::InvalidRegistryLink);
+        }
+
+        Ok(())
+    }
+
+    fn is_whitespace_only(bytes: &Bytes) -> bool {
+        for i in 0..bytes.len() {
+            if !bytes.get(i).unwrap().is_ascii_whitespace() {
+                return false;
+            }
+        }
+        true
+    }
+
+    fn validate_semver(bytes: &Bytes) -> bool {
+        let mut dots = 0u32;
+        let mut current_len = 0u32;
+        for i in 0..bytes.len() {
+            let byte = bytes.get(i).unwrap();
+            if byte == b'.' {
+                if current_len == 0 {
+                    return false;
+                }
+                dots += 1;
+                current_len = 0;
+            } else if !byte.is_ascii_digit() {
+                return false;
+            } else {
+                current_len += 1;
+            }
+        }
+        current_len > 0 && dots == 2
+    }
+
+    fn is_valid_url(bytes: &Bytes) -> bool {
+        // Check "https://" prefix (8 bytes)
+        let https_prefix = [104u8, 116, 116, 112, 115, 58, 47, 47];
+        if bytes.len() >= 8 {
+            let mut match_https = true;
+            for i in 0..8u32 {
+                if bytes.get(i).unwrap() != https_prefix[i as usize] {
+                    match_https = false;
+                    break;
+                }
+            }
+            if match_https {
+                return true;
+            }
+        }
+        // Check "http://" prefix (7 bytes)
+        let http_prefix = [104u8, 116, 116, 112, 58, 47, 47];
+        if bytes.len() >= 7 {
+            for i in 0..7u32 {
+                if bytes.get(i).unwrap() != http_prefix[i as usize] {
+                    return false;
+                }
+            }
+            return true;
+        }
+        false
+    }
+
     pub fn mint_methodology(env: Env, caller: Address, owner: Address, meta: MethodologyMeta) -> Result<u32, Error> {
         caller.require_auth();
+
+        // Validate metadata before storage
+        Self::validate_metadata(&env, &meta)?;
 
         let authorities: Vec<Address> = env
             .storage()
@@ -114,6 +234,37 @@ impl MethodologyLibrary {
         );
 
         Ok(token_id)
+    }
+
+    pub fn update_methodology_metadata(
+        env: Env,
+        caller: Address,
+        token_id: u32,
+        meta: MethodologyMeta,
+    ) -> Result<(), Error> {
+        caller.require_auth();
+
+        // Validate the new metadata
+        Self::validate_metadata(&env, &meta)?;
+
+        // Get existing methodology
+        let existing = Self::get_methodology_meta(env.clone(), token_id)?;
+
+        // Only the issuing authority can update metadata
+        if existing.issuing_authority != caller {
+            return Err(Error::Unauthorized);
+        }
+
+        // Update metadata in storage
+        env.storage().persistent().set(&DataKey::Methodology(token_id), &meta);
+
+        // Publish update event
+        env.events().publish(
+            (symbol_short!("meta_upd"), token_id),
+            (meta.name, meta.version),
+        );
+
+        Ok(())
     }
 
     pub fn owner_of(env: Env, token_id: u32) -> Result<Address, Error> {
@@ -422,7 +573,7 @@ mod test {
 
         let meta = MethodologyMeta {
             name: String::from_str(&env, "Improved Forest Management"),
-            version: String::from_str(&env, "VM0042 v2.1"),
+            version: String::from_str(&env, "1.0.0"),
             registry: String::from_str(&env, "VERRA"),
             registry_link: String::from_str(&env, "https://verra.org"),
             issuing_authority: authority.clone(),
@@ -616,7 +767,7 @@ mod test {
 
         let meta = MethodologyMeta {
             name: String::from_str(&env, "Improved Forest Management"),
-            version: String::from_str(&env, "VM0042 v2.1"),
+            version: String::from_str(&env, "1.0.0"),
             registry: String::from_str(&env, "VERRA"),
             registry_link: String::from_str(&env, "https://verra.org"),
             issuing_authority: non_authority.clone(),
@@ -625,5 +776,639 @@ mod test {
 
         let result = client.try_mint_methodology(&non_authority, &owner, &meta);
         assert_eq!(result, Err(Ok(Error::NotAuthorizedAuthority)));
+    }
+
+    #[test]
+    fn test_validation_empty_name() {
+        let env = Env::default();
+        env.mock_all_auths();
+
+        let admin = Address::generate(&env);
+        let authority = Address::generate(&env);
+        let owner = Address::generate(&env);
+
+        let contract_id = env.register(MethodologyLibrary, ());
+        let client = MethodologyLibraryClient::new(&env, &contract_id);
+
+        client.initialize(
+            &admin,
+            &String::from_str(&env, "Carbon methodology"),
+            &String::from_str(&env, "CSC-METH"),
+            &7u64,
+        );
+        client.add_authority(&admin, &authority);
+
+        let meta = MethodologyMeta {
+            name: String::from_str(&env, ""),
+            version: String::from_str(&env, "1.0.0"),
+            registry: String::from_str(&env, "VERRA"),
+            registry_link: String::from_str(&env, "https://verra.org"),
+            issuing_authority: authority.clone(),
+            ipfs_cid: None,
+        };
+
+        let result = client.try_mint_methodology(&authority, &owner, &meta);
+        assert_eq!(result, Err(Ok(Error::InvalidName)));
+    }
+
+    #[test]
+    fn test_validation_whitespace_name() {
+        let env = Env::default();
+        env.mock_all_auths();
+
+        let admin = Address::generate(&env);
+        let authority = Address::generate(&env);
+        let owner = Address::generate(&env);
+
+        let contract_id = env.register(MethodologyLibrary, ());
+        let client = MethodologyLibraryClient::new(&env, &contract_id);
+
+        client.initialize(
+            &admin,
+            &String::from_str(&env, "Carbon methodology"),
+            &String::from_str(&env, "CSC-METH"),
+            &7u64,
+        );
+        client.add_authority(&admin, &authority);
+
+        let meta = MethodologyMeta {
+            name: String::from_str(&env, "   "),
+            version: String::from_str(&env, "1.0.0"),
+            registry: String::from_str(&env, "VERRA"),
+            registry_link: String::from_str(&env, "https://verra.org"),
+            issuing_authority: authority.clone(),
+            ipfs_cid: None,
+        };
+
+        let result = client.try_mint_methodology(&authority, &owner, &meta);
+        assert_eq!(result, Err(Ok(Error::InvalidName)));
+    }
+
+    #[test]
+    fn test_validation_name_too_long() {
+        let env = Env::default();
+        env.mock_all_auths();
+
+        let admin = Address::generate(&env);
+        let authority = Address::generate(&env);
+        let owner = Address::generate(&env);
+
+        let contract_id = env.register(MethodologyLibrary, ());
+        let client = MethodologyLibraryClient::new(&env, &contract_id);
+
+        client.initialize(
+            &admin,
+            &String::from_str(&env, "Carbon methodology"),
+            &String::from_str(&env, "CSC-METH"),
+            &7u64,
+        );
+        client.add_authority(&admin, &authority);
+
+        let meta = MethodologyMeta {
+            name: String::from_str(&env, "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"), // 101 A's
+            version: String::from_str(&env, "1.0.0"),
+            registry: String::from_str(&env, "VERRA"),
+            registry_link: String::from_str(&env, "https://verra.org"),
+            issuing_authority: authority.clone(),
+            ipfs_cid: None,
+        };
+
+        let result = client.try_mint_methodology(&authority, &owner, &meta);
+        assert_eq!(result, Err(Ok(Error::MetadataTooLong)));
+    }
+
+    #[test]
+    fn test_validation_empty_version() {
+        let env = Env::default();
+        env.mock_all_auths();
+
+        let admin = Address::generate(&env);
+        let authority = Address::generate(&env);
+        let owner = Address::generate(&env);
+
+        let contract_id = env.register(MethodologyLibrary, ());
+        let client = MethodologyLibraryClient::new(&env, &contract_id);
+
+        client.initialize(
+            &admin,
+            &String::from_str(&env, "Carbon methodology"),
+            &String::from_str(&env, "CSC-METH"),
+            &7u64,
+        );
+        client.add_authority(&admin, &authority);
+
+        let meta = MethodologyMeta {
+            name: String::from_str(&env, "Improved Forest Management"),
+            version: String::from_str(&env, ""),
+            registry: String::from_str(&env, "VERRA"),
+            registry_link: String::from_str(&env, "https://verra.org"),
+            issuing_authority: authority.clone(),
+            ipfs_cid: None,
+        };
+
+        let result = client.try_mint_methodology(&authority, &owner, &meta);
+        assert_eq!(result, Err(Ok(Error::InvalidVersion)));
+    }
+
+    #[test]
+    fn test_validation_invalid_version_format() {
+        let env = Env::default();
+        env.mock_all_auths();
+
+        let admin = Address::generate(&env);
+        let authority = Address::generate(&env);
+        let owner = Address::generate(&env);
+
+        let contract_id = env.register(MethodologyLibrary, ());
+        let client = MethodologyLibraryClient::new(&env, &contract_id);
+
+        client.initialize(
+            &admin,
+            &String::from_str(&env, "Carbon methodology"),
+            &String::from_str(&env, "CSC-METH"),
+            &7u64,
+        );
+        client.add_authority(&admin, &authority);
+
+        // Test version without dots
+        let meta = MethodologyMeta {
+            name: String::from_str(&env, "Improved Forest Management"),
+            version: String::from_str(&env, "v1"),
+            registry: String::from_str(&env, "VERRA"),
+            registry_link: String::from_str(&env, "https://verra.org"),
+            issuing_authority: authority.clone(),
+            ipfs_cid: None,
+        };
+
+        let result = client.try_mint_methodology(&authority, &owner, &meta);
+        assert_eq!(result, Err(Ok(Error::InvalidVersion)));
+    }
+
+    #[test]
+    fn test_validation_version_too_long() {
+        let env = Env::default();
+        env.mock_all_auths();
+
+        let admin = Address::generate(&env);
+        let authority = Address::generate(&env);
+        let owner = Address::generate(&env);
+
+        let contract_id = env.register(MethodologyLibrary, ());
+        let client = MethodologyLibraryClient::new(&env, &contract_id);
+
+        client.initialize(
+            &admin,
+            &String::from_str(&env, "Carbon methodology"),
+            &String::from_str(&env, "CSC-METH"),
+            &7u64,
+        );
+        client.add_authority(&admin, &authority);
+
+        let long_version = "1234567890.1234567890.1"; // 22 chars > 20
+        let meta = MethodologyMeta {
+            name: String::from_str(&env, "Improved Forest Management"),
+            version: String::from_str(&env, long_version),
+            registry: String::from_str(&env, "VERRA"),
+            registry_link: String::from_str(&env, "https://verra.org"),
+            issuing_authority: authority.clone(),
+            ipfs_cid: None,
+        };
+
+        let result = client.try_mint_methodology(&authority, &owner, &meta);
+        assert_eq!(result, Err(Ok(Error::MetadataTooLong)));
+    }
+
+    #[test]
+    fn test_validation_empty_registry() {
+        let env = Env::default();
+        env.mock_all_auths();
+
+        let admin = Address::generate(&env);
+        let authority = Address::generate(&env);
+        let owner = Address::generate(&env);
+
+        let contract_id = env.register(MethodologyLibrary, ());
+        let client = MethodologyLibraryClient::new(&env, &contract_id);
+
+        client.initialize(
+            &admin,
+            &String::from_str(&env, "Carbon methodology"),
+            &String::from_str(&env, "CSC-METH"),
+            &7u64,
+        );
+        client.add_authority(&admin, &authority);
+
+        let meta = MethodologyMeta {
+            name: String::from_str(&env, "Improved Forest Management"),
+            version: String::from_str(&env, "1.0.0"),
+            registry: String::from_str(&env, ""),
+            registry_link: String::from_str(&env, "https://verra.org"),
+            issuing_authority: authority.clone(),
+            ipfs_cid: None,
+        };
+
+        let result = client.try_mint_methodology(&authority, &owner, &meta);
+        assert_eq!(result, Err(Ok(Error::InvalidRegistry)));
+    }
+
+    #[test]
+    fn test_validation_empty_registry_link() {
+        let env = Env::default();
+        env.mock_all_auths();
+
+        let admin = Address::generate(&env);
+        let authority = Address::generate(&env);
+        let owner = Address::generate(&env);
+
+        let contract_id = env.register(MethodologyLibrary, ());
+        let client = MethodologyLibraryClient::new(&env, &contract_id);
+
+        client.initialize(
+            &admin,
+            &String::from_str(&env, "Carbon methodology"),
+            &String::from_str(&env, "CSC-METH"),
+            &7u64,
+        );
+        client.add_authority(&admin, &authority);
+
+        let meta = MethodologyMeta {
+            name: String::from_str(&env, "Improved Forest Management"),
+            version: String::from_str(&env, "1.0.0"),
+            registry: String::from_str(&env, "VERRA"),
+            registry_link: String::from_str(&env, ""),
+            issuing_authority: authority.clone(),
+            ipfs_cid: None,
+        };
+
+        let result = client.try_mint_methodology(&authority, &owner, &meta);
+        assert_eq!(result, Err(Ok(Error::InvalidRegistryLink)));
+    }
+
+    #[test]
+    fn test_validation_invalid_url() {
+        let env = Env::default();
+        env.mock_all_auths();
+
+        let admin = Address::generate(&env);
+        let authority = Address::generate(&env);
+        let owner = Address::generate(&env);
+
+        let contract_id = env.register(MethodologyLibrary, ());
+        let client = MethodologyLibraryClient::new(&env, &contract_id);
+
+        client.initialize(
+            &admin,
+            &String::from_str(&env, "Carbon methodology"),
+            &String::from_str(&env, "CSC-METH"),
+            &7u64,
+        );
+        client.add_authority(&admin, &authority);
+
+        let meta = MethodologyMeta {
+            name: String::from_str(&env, "Improved Forest Management"),
+            version: String::from_str(&env, "1.0.0"),
+            registry: String::from_str(&env, "VERRA"),
+            registry_link: String::from_str(&env, "not-a-url"),
+            issuing_authority: authority.clone(),
+            ipfs_cid: None,
+        };
+
+        let result = client.try_mint_methodology(&authority, &owner, &meta);
+        assert_eq!(result, Err(Ok(Error::InvalidRegistryLink)));
+    }
+
+    #[test]
+    fn test_validation_registry_link_too_long() {
+        let env = Env::default();
+        env.mock_all_auths();
+
+        let admin = Address::generate(&env);
+        let authority = Address::generate(&env);
+        let owner = Address::generate(&env);
+
+        let contract_id = env.register(MethodologyLibrary, ());
+        let client = MethodologyLibraryClient::new(&env, &contract_id);
+
+        client.initialize(
+            &admin,
+            &String::from_str(&env, "Carbon methodology"),
+            &String::from_str(&env, "CSC-METH"),
+            &7u64,
+        );
+        client.add_authority(&admin, &authority);
+
+        let meta = MethodologyMeta {
+            name: String::from_str(&env, "Improved Forest Management"),
+            version: String::from_str(&env, "1.0.0"),
+            registry: String::from_str(&env, "VERRA"),
+            registry_link: String::from_str(&env, "https://example.com/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"), // 270 chars > 255
+            issuing_authority: authority.clone(),
+            ipfs_cid: None,
+        };
+
+        let result = client.try_mint_methodology(&authority, &owner, &meta);
+        assert_eq!(result, Err(Ok(Error::MetadataTooLong)));
+    }
+
+    #[test]
+    fn test_validation_registry_too_long() {
+        let env = Env::default();
+        env.mock_all_auths();
+
+        let admin = Address::generate(&env);
+        let authority = Address::generate(&env);
+        let owner = Address::generate(&env);
+
+        let contract_id = env.register(MethodologyLibrary, ());
+        let client = MethodologyLibraryClient::new(&env, &contract_id);
+
+        client.initialize(
+            &admin,
+            &String::from_str(&env, "Carbon methodology"),
+            &String::from_str(&env, "CSC-METH"),
+            &7u64,
+        );
+        client.add_authority(&admin, &authority);
+
+        let meta = MethodologyMeta {
+            name: String::from_str(&env, "Improved Forest Management"),
+            version: String::from_str(&env, "1.0.0"),
+            registry: String::from_str(&env, "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"), // 51 A's
+            registry_link: String::from_str(&env, "https://verra.org"),
+            issuing_authority: authority.clone(),
+            ipfs_cid: None,
+        };
+
+        let result = client.try_mint_methodology(&authority, &owner, &meta);
+        assert_eq!(result, Err(Ok(Error::MetadataTooLong)));
+    }
+
+    #[test]
+    fn test_validation_valid_http_url() {
+        let env = Env::default();
+        env.mock_all_auths();
+
+        let admin = Address::generate(&env);
+        let authority = Address::generate(&env);
+        let owner = Address::generate(&env);
+
+        let contract_id = env.register(MethodologyLibrary, ());
+        let client = MethodologyLibraryClient::new(&env, &contract_id);
+
+        client.initialize(
+            &admin,
+            &String::from_str(&env, "Carbon methodology"),
+            &String::from_str(&env, "CSC-METH"),
+            &7u64,
+        );
+        client.add_authority(&admin, &authority);
+
+        // http:// URLs should also be accepted
+        let meta = MethodologyMeta {
+            name: String::from_str(&env, "Improved Forest Management"),
+            version: String::from_str(&env, "2.1.0"),
+            registry: String::from_str(&env, "GOLDSTANDARD"),
+            registry_link: String::from_str(&env, "http://goldstandard.org"),
+            issuing_authority: authority.clone(),
+            ipfs_cid: None,
+        };
+
+        let token_id = client.mint_methodology(&authority, &owner, &meta);
+        assert_eq!(token_id, 1);
+    }
+
+    #[test]
+    fn test_update_methodology_metadata() {
+        let env = Env::default();
+        env.mock_all_auths();
+
+        let admin = Address::generate(&env);
+        let authority = Address::generate(&env);
+        let owner = Address::generate(&env);
+
+        let contract_id = env.register(MethodologyLibrary, ());
+        let client = MethodologyLibraryClient::new(&env, &contract_id);
+
+        client.initialize(
+            &admin,
+            &String::from_str(&env, "Carbon methodology"),
+            &String::from_str(&env, "CSC-METH"),
+            &7u64,
+        );
+        client.add_authority(&admin, &authority);
+
+        let meta = MethodologyMeta {
+            name: String::from_str(&env, "Improved Forest Management"),
+            version: String::from_str(&env, "1.0.0"),
+            registry: String::from_str(&env, "VERRA"),
+            registry_link: String::from_str(&env, "https://verra.org"),
+            issuing_authority: authority.clone(),
+            ipfs_cid: None,
+        };
+
+        let token_id = client.mint_methodology(&authority, &owner, &meta);
+        assert_eq!(token_id, 1);
+
+        // Update metadata with new values
+        let updated_meta = MethodologyMeta {
+            name: String::from_str(&env, "Improved Forest Management v2"),
+            version: String::from_str(&env, "2.0.0"),
+            registry: String::from_str(&env, "VERRA"),
+            registry_link: String::from_str(&env, "https://verra.org/updated"),
+            issuing_authority: authority.clone(),
+            ipfs_cid: Some(String::from_str(&env, "QmUpdated")),
+        };
+
+        client.update_methodology_metadata(&authority, &token_id, &updated_meta);
+
+        let saved_meta = client.get_methodology_meta(&token_id);
+        assert_eq!(saved_meta.name, updated_meta.name);
+        assert_eq!(saved_meta.version, updated_meta.version);
+        assert_eq!(saved_meta.registry_link, updated_meta.registry_link);
+        assert_eq!(saved_meta.ipfs_cid, updated_meta.ipfs_cid);
+    }
+
+    #[test]
+    fn test_update_metadata_unauthorized() {
+        let env = Env::default();
+        env.mock_all_auths();
+
+        let admin = Address::generate(&env);
+        let authority = Address::generate(&env);
+        let other = Address::generate(&env);
+        let owner = Address::generate(&env);
+
+        let contract_id = env.register(MethodologyLibrary, ());
+        let client = MethodologyLibraryClient::new(&env, &contract_id);
+
+        client.initialize(
+            &admin,
+            &String::from_str(&env, "Carbon methodology"),
+            &String::from_str(&env, "CSC-METH"),
+            &7u64,
+        );
+        client.add_authority(&admin, &authority);
+
+        let meta = MethodologyMeta {
+            name: String::from_str(&env, "Improved Forest Management"),
+            version: String::from_str(&env, "1.0.0"),
+            registry: String::from_str(&env, "VERRA"),
+            registry_link: String::from_str(&env, "https://verra.org"),
+            issuing_authority: authority.clone(),
+            ipfs_cid: None,
+        };
+
+        let token_id = client.mint_methodology(&authority, &owner, &meta);
+
+        // Try to update with a non-authority caller
+        let updated_meta = MethodologyMeta {
+            name: String::from_str(&env, "Updated Name"),
+            version: String::from_str(&env, "2.0.0"),
+            registry: String::from_str(&env, "VERRA"),
+            registry_link: String::from_str(&env, "https://verra.org"),
+            issuing_authority: authority.clone(),
+            ipfs_cid: None,
+        };
+
+        let result = client.try_update_methodology_metadata(&other, &token_id, &updated_meta);
+        assert_eq!(result, Err(Ok(Error::Unauthorized)));
+    }
+
+    #[test]
+    fn test_update_metadata_invalid_name() {
+        let env = Env::default();
+        env.mock_all_auths();
+
+        let admin = Address::generate(&env);
+        let authority = Address::generate(&env);
+        let owner = Address::generate(&env);
+
+        let contract_id = env.register(MethodologyLibrary, ());
+        let client = MethodologyLibraryClient::new(&env, &contract_id);
+
+        client.initialize(
+            &admin,
+            &String::from_str(&env, "Carbon methodology"),
+            &String::from_str(&env, "CSC-METH"),
+            &7u64,
+        );
+        client.add_authority(&admin, &authority);
+
+        let meta = MethodologyMeta {
+            name: String::from_str(&env, "Improved Forest Management"),
+            version: String::from_str(&env, "1.0.0"),
+            registry: String::from_str(&env, "VERRA"),
+            registry_link: String::from_str(&env, "https://verra.org"),
+            issuing_authority: authority.clone(),
+            ipfs_cid: None,
+        };
+
+        let token_id = client.mint_methodology(&authority, &owner, &meta);
+
+        // Update with empty name
+        let invalid_meta = MethodologyMeta {
+            name: String::from_str(&env, ""),
+            version: String::from_str(&env, "2.0.0"),
+            registry: String::from_str(&env, "VERRA"),
+            registry_link: String::from_str(&env, "https://verra.org"),
+            issuing_authority: authority.clone(),
+            ipfs_cid: None,
+        };
+
+        let result = client.try_update_methodology_metadata(&authority, &token_id, &invalid_meta);
+        assert_eq!(result, Err(Ok(Error::InvalidName)));
+    }
+
+    #[test]
+    fn test_validation_whitespace_registry_link() {
+        let env = Env::default();
+        env.mock_all_auths();
+
+        let admin = Address::generate(&env);
+        let authority = Address::generate(&env);
+        let owner = Address::generate(&env);
+
+        let contract_id = env.register(MethodologyLibrary, ());
+        let client = MethodologyLibraryClient::new(&env, &contract_id);
+
+        client.initialize(
+            &admin,
+            &String::from_str(&env, "Carbon methodology"),
+            &String::from_str(&env, "CSC-METH"),
+            &7u64,
+        );
+        client.add_authority(&admin, &authority);
+
+        let meta = MethodologyMeta {
+            name: String::from_str(&env, "Improved Forest Management"),
+            version: String::from_str(&env, "1.0.0"),
+            registry: String::from_str(&env, "VERRA"),
+            registry_link: String::from_str(&env, "   "),
+            issuing_authority: authority.clone(),
+            ipfs_cid: None,
+        };
+
+        let result = client.try_mint_methodology(&authority, &owner, &meta);
+        assert_eq!(result, Err(Ok(Error::InvalidRegistryLink)));
+    }
+
+    #[test]
+    fn test_validation_semver_edge_cases() {
+        let env = Env::default();
+        env.mock_all_auths();
+
+        let admin = Address::generate(&env);
+        let authority = Address::generate(&env);
+        let owner = Address::generate(&env);
+
+        let contract_id = env.register(MethodologyLibrary, ());
+        let client = MethodologyLibraryClient::new(&env, &contract_id);
+
+        client.initialize(
+            &admin,
+            &String::from_str(&env, "Carbon methodology"),
+            &String::from_str(&env, "CSC-METH"),
+            &7u64,
+        );
+        client.add_authority(&admin, &authority);
+
+        // Test empty version (just dots "..")
+        let meta = MethodologyMeta {
+            name: String::from_str(&env, "Improved Forest Management"),
+            version: String::from_str(&env, ".."),
+            registry: String::from_str(&env, "VERRA"),
+            registry_link: String::from_str(&env, "https://verra.org"),
+            issuing_authority: authority.clone(),
+            ipfs_cid: None,
+        };
+
+        let result = client.try_mint_methodology(&authority, &owner, &meta);
+        assert_eq!(result, Err(Ok(Error::InvalidVersion)));
+
+        // Test version with letters
+        let meta2 = MethodologyMeta {
+            name: String::from_str(&env, "Improved Forest Management"),
+            version: String::from_str(&env, "1.2.a"),
+            registry: String::from_str(&env, "VERRA"),
+            registry_link: String::from_str(&env, "https://verra.org"),
+            issuing_authority: authority.clone(),
+            ipfs_cid: None,
+        };
+
+        let result2 = client.try_mint_methodology(&authority, &owner, &meta2);
+        assert_eq!(result2, Err(Ok(Error::InvalidVersion)));
+
+        // Test version with only one dot
+        let meta3 = MethodologyMeta {
+            name: String::from_str(&env, "Improved Forest Management"),
+            version: String::from_str(&env, "1.2"),
+            registry: String::from_str(&env, "VERRA"),
+            registry_link: String::from_str(&env, "https://verra.org"),
+            issuing_authority: authority.clone(),
+            ipfs_cid: None,
+        };
+
+        let result3 = client.try_mint_methodology(&authority, &owner, &meta3);
+        assert_eq!(result3, Err(Ok(Error::InvalidVersion)));
     }
 }

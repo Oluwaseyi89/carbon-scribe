@@ -1,7 +1,15 @@
 #![no_std]
 use soroban_sdk::{
-    contract, contractimpl, contracttype, Address, Bytes, BytesN, Env, String, Symbol, Vec,
+    contract, contractimpl, contracttype, Address, BytesN, Env, String, Symbol, Vec,
 };
+
+mod errors;
+mod events;
+
+#[cfg(test)]
+mod test;
+
+pub use errors::ContractError;
 
 #[contracttype]
 #[derive(Clone, Debug, PartialEq)]
@@ -56,19 +64,33 @@ pub struct AttributeDefinition {
 
 #[contractimpl]
 impl TaxAttributeContract {
-    pub fn init(env: Env, admin: Address) {
-        if env.storage().instance().has(&DataKey::Admin) {
-            panic!("Already initialized");
+    /// View function returning true if contract is initialized.
+    pub fn is_initialized(env: Env) -> bool {
+        env.storage().instance().has(&DataKey::Admin)
+    }
+
+    /// One-time contract initialization.
+    /// Returns ContractError::AlreadyInitialized on re-initialization attempts.
+    pub fn init(env: Env, admin: Address) -> Result<(), ContractError> {
+        if Self::is_initialized(env.clone()) {
+            events::emit_reinitialization_attempted_event(&env, admin);
+            return Err(ContractError::AlreadyInitialized);
         }
         env.storage().instance().set(&DataKey::Admin, &admin);
         let empty_issuers: Vec<Address> = Vec::new(&env);
         env.storage()
             .instance()
             .set(&DataKey::AllIssuers, &empty_issuers);
+        events::emit_initialized_event(&env, admin);
+        Ok(())
     }
 
-    pub fn add_issuer(env: Env, issuer: Address) {
-        let admin: Address = env.storage().instance().get(&DataKey::Admin).unwrap();
+    pub fn add_issuer(env: Env, issuer: Address) -> Result<(), ContractError> {
+        let admin: Address = env
+            .storage()
+            .instance()
+            .get(&DataKey::Admin)
+            .ok_or(ContractError::NotAuthorized)?;
         admin.require_auth();
 
         if !env
@@ -90,12 +112,18 @@ impl TaxAttributeContract {
                 .instance()
                 .set(&DataKey::AllIssuers, &all_issuers);
 
+            #[allow(deprecated)]
             env.events().publish((Symbol::short("iss_add"),), issuer.clone());
         }
+        Ok(())
     }
 
-    pub fn remove_issuer(env: Env, issuer: Address) {
-        let admin: Address = env.storage().instance().get(&DataKey::Admin).unwrap();
+    pub fn remove_issuer(env: Env, issuer: Address) -> Result<(), ContractError> {
+        let admin: Address = env
+            .storage()
+            .instance()
+            .get(&DataKey::Admin)
+            .ok_or(ContractError::NotAuthorized)?;
         admin.require_auth();
 
         if env
@@ -120,8 +148,10 @@ impl TaxAttributeContract {
                     .set(&DataKey::AllIssuers, &all_issuers);
             }
 
+            #[allow(deprecated)]
             env.events().publish((Symbol::short("iss_rem"),), issuer.clone());
         }
+        Ok(())
     }
 
     pub fn attach_tax_attribute(
@@ -129,7 +159,7 @@ impl TaxAttributeContract {
         issuer: Address,
         token_id: u32,
         definition: AttributeDefinition,
-    ) {
+    ) -> Result<(), ContractError> {
         issuer.require_auth();
 
         // Verify issuer is authorized
@@ -138,13 +168,13 @@ impl TaxAttributeContract {
             .instance()
             .has(&DataKey::Issuer(issuer.clone()))
         {
-            panic!("Caller is not an authorized issuer");
+            return Err(ContractError::NotAuthorizedIssuer);
         }
 
         // Verify the attribute window is not already expired
         let current_time = env.ledger().timestamp();
         if current_time > definition.valid_until {
-            panic!("Cannot attach an expired attribute");
+            return Err(ContractError::AttributeExpired);
         }
 
         // Verify tag_id uniqueness
@@ -153,7 +183,7 @@ impl TaxAttributeContract {
             .persistent()
             .has(&DataKey::Attribute(definition.tag_id.clone()))
         {
-            panic!("Attribute tag_id already exists");
+            return Err(ContractError::AttributeAlreadyExists);
         }
 
         let attribute = TaxAttributeTag {
@@ -183,39 +213,38 @@ impl TaxAttributeContract {
         env.storage()
             .persistent()
             .set(&DataKey::TokenAttributes(token_id), &attached_tags);
+
+        Ok(())
     }
 
-    pub fn revoke_attribute(env: Env, caller: Address, token_id: u32, tag_id: String) {
+    pub fn revoke_attribute(
+        env: Env,
+        caller: Address,
+        token_id: u32,
+        tag_id: String,
+    ) -> Result<(), ContractError> {
         caller.require_auth();
 
         // Load attribute
         let key = DataKey::Attribute(tag_id.clone());
         if !env.storage().persistent().has(&key) {
-            panic!("Attribute not found");
+            return Err(ContractError::AttributeNotFound);
         }
-        let attribute: TaxAttributeTag = env.storage().persistent().get(&key).unwrap();
+        let attribute: TaxAttributeTag = env
+            .storage()
+            .persistent()
+            .get(&key)
+            .ok_or(ContractError::AttributeNotFound)?;
 
         // Check auth: Admin or Original Issuer
-        let admin: Address = env.storage().instance().get(&DataKey::Admin).unwrap();
+        let admin: Address = env
+            .storage()
+            .instance()
+            .get(&DataKey::Admin)
+            .ok_or(ContractError::NotAuthorized)?;
         if caller != admin && caller != attribute.issuing_authority {
-            panic!("Not authorized to revoke");
+            return Err(ContractError::NotAuthorized);
         }
-
-        // Revocation means removing it or marking it invalid.
-        // The prompt says "Revocation: An issuer can revoke a specific attribute... emitting a clear audit event."
-        // And "All attached attributes are immutable... (except for revocation status)."
-        // But `TaxAttributeTag` struct I defined implies we might remove it or change valid_until?
-        // Prompt Data Structure `struct TaxAttributeTag` didn't have `active` bool explicitly in the User Prompt's `Data Structures` block,
-        // but it listed `valid_until`. If we remove it from `TokenAttributes` map, it's effectively revoked from the token.
-        // However, `Attribute` map stores the definition.
-
-        // If we simply remove it from the Token's list, `get_attributes_for_token` won't return it.
-        // The prompt says "Attributes for token... returns all active".
-
-        // Option 1: Remove from `TokenAttributes` list.
-        // Option 2: Update `TaxAttributeTag` valid_until to 0 or now.
-
-        // Let's remove it from the `TokenAttributes` list.
 
         let mut attached_tags: Vec<String> = env
             .storage()
@@ -229,12 +258,10 @@ impl TaxAttributeContract {
             env.storage()
                 .persistent()
                 .set(&DataKey::TokenAttributes(token_id), &attached_tags);
+            Ok(())
         } else {
-            panic!("Attribute not attached to this token");
+            Err(ContractError::AttributeNotAttached)
         }
-
-        // We probably should also update the attribute itself to mark it as revoked if we want to trace it later by ID.
-        // But removing from the token link is enough to satisfy "is_token_eligible" returning false.
     }
 
     pub fn get_attributes_for_token(env: Env, token_id: u32) -> Vec<TaxAttributeTag> {
@@ -253,7 +280,6 @@ impl TaxAttributeContract {
                 .persistent()
                 .get::<DataKey, TaxAttributeTag>(&DataKey::Attribute(tag_id))
             {
-                // Check validity
                 if now >= attribute.valid_from && now <= attribute.valid_until {
                     result.push_back(attribute);
                 }
@@ -294,18 +320,14 @@ impl TaxAttributeContract {
 
         let ledger_sequence = env.ledger().sequence();
 
-        // Create deterministic proof using a simple approach
-        // The proof hash is based on the ledger sequence and authorization status
-        // We'll use a simple u64-based hash converted to BytesN<32>
         let hash_input = (ledger_sequence as u64) * 1000 + (if is_authorized { 1u64 } else { 0u64 });
-        
-        // Create a BytesN<32> from the hash input
+
         let hash_bytes = hash_input.to_be_bytes();
         let mut proof_bytes = [0u8; 32];
         for i in 0..8 {
             proof_bytes[i] = hash_bytes[i];
         }
-        
+
         let proof_hash = BytesN::from_array(&env, &proof_bytes);
 
         IssuerProof {
@@ -325,20 +347,16 @@ impl TaxAttributeContract {
     }
 
     pub fn verify_issuer_proof(env: Env, proof: IssuerProof) -> bool {
-        // Recompute the proof to verify it matches
         let computed_proof = Self::generate_issuer_proof(env, proof.issuer.clone());
 
-        // Verify the proof hash matches
         if computed_proof.proof_hash != proof.proof_hash {
             return false;
         }
 
-        // Verify the authorization status matches current state
         if computed_proof.is_authorized != proof.is_authorized {
             return false;
         }
 
-        // Verify ledger sequence matches current state
         if computed_proof.ledger_sequence != proof.ledger_sequence {
             return false;
         }

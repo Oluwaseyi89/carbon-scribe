@@ -116,7 +116,7 @@
                         "symbol": "version"
                       },
                       "val": {
-                        "string": "VM0042 v2.1"
+                        "string": "1.0.0"
                       }
                     }
                   ]
@@ -556,7 +556,7 @@
                         "symbol": "version"
                       },
                       "val": {
-                        "string": "VM0042 v2.1"
+                        "string": "1.0.0"
                       }
                     }
                   ]

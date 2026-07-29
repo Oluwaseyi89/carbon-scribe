@@ -1,89 +1,40 @@
 #![no_std]
-use soroban_sdk::{
-    contract, contracterror, contractimpl, contracttype, Address, BytesN, Env, String, Vec,
-};
+use soroban_sdk::{contract, contractimpl, Address, BytesN, Env, String, Vec};
 
+mod errors;
 mod events;
+mod storage;
+
+#[cfg(test)]
 mod test;
 
-#[derive(Clone, Debug, Eq, PartialEq)]
-#[contracttype]
-pub enum OperationType {
-    TRANSFER,
-    RETIREMENT,
-}
-
-#[derive(Clone)]
-#[contracttype]
-pub struct JurisdictionRule {
-    pub rule_id: String,
-    pub description: String,
-    pub source_jur: String,
-    pub dest_jur: String,
-    pub host_jur: String,
-    pub operation: OperationType,
-    pub is_allowed: bool,
-    pub required_authority: Option<Address>,
-}
-
-#[derive(Clone)]
-#[contracttype]
-pub struct ValidationResult {
-    pub is_compliant: bool,
-    pub rule_id: Option<String>,
-    pub requires_authorization: bool,
-    pub authority_address: Option<Address>,
-    pub error_message: Option<String>,
-}
-
-#[derive(Clone)]
-#[contracttype]
-pub struct PendingApproval {
-    pub token_id: u32,
-    pub source: Address,
-    pub destination: Address,
-    pub operation: OperationType,
-    pub timestamp: u64,
-    pub approved: bool,
-}
-
-#[derive(Clone)]
-#[contracttype]
-pub enum DataKey {
-    Admin,
-    Governance,
-    CarbonAssetContract,
-    Rule(String),
-    ActiveRuleIds,
-    AddressJurisdiction(Address),
-    PendingApproval(BytesN<32>),
-}
-
-#[derive(Debug, Clone, Copy)]
-#[contracterror]
-pub enum ContractError {
-    NotAuthorized = 1,
-    RuleNotFound = 2,
-    RuleAlreadyExists = 3,
-    JurisdictionNotSet = 4,
-    InvalidApprovalKey = 5,
-    ApprovalExpired = 6,
-    NoMatchingRule = 7,
-    RuleConflict = 8, // New error for logical duplicate/conflict
-}
+pub use errors::ContractError;
+pub use storage::{DataKey, JurisdictionRule, OperationType, PendingApproval, ValidationResult};
 
 #[contract]
 pub struct RegulatoryCheck;
 
 #[contractimpl]
 impl RegulatoryCheck {
-    /// Initialize the contract
+    /// Returns true if the contract has been initialized.
+    pub fn is_initialized(env: Env) -> bool {
+        env.storage().instance().has(&DataKey::Admin)
+    }
+
+    /// One-time initialization of the contract.
+    /// Sets admin, governance, carbon_asset_contract, and active rules storage.
+    /// Returns ContractError::AlreadyInitialized if called more than once.
     pub fn initialize(
         env: Env,
         admin: Address,
         governance: Address,
         carbon_asset_contract: Address,
-    ) {
+    ) -> Result<(), ContractError> {
+        if Self::is_initialized(env.clone()) {
+            events::emit_reinitialization_attempted_event(&env, admin);
+            return Err(ContractError::AlreadyInitialized);
+        }
+
         admin.require_auth();
 
         env.storage().instance().set(&DataKey::Admin, &admin);
@@ -99,6 +50,10 @@ impl RegulatoryCheck {
         env.storage()
             .instance()
             .set(&DataKey::ActiveRuleIds, &active_rules);
+
+        events::emit_initialized_event(&env, admin, governance, carbon_asset_contract);
+
+        Ok(())
     }
 
     // ========================================================================
@@ -142,8 +97,12 @@ impl RegulatoryCheck {
                 .get::<DataKey, JurisdictionRule>(&existing_key)
             {
                 if Self::rules_conflict(&rule, &existing_rule) {
-                    // Compose a clear error message (not possible to return string in ContractError, so log it)
-                    soroban_sdk::log!(&env, "Rule conflict: attempted to add rule {:?} which conflicts with existing rule {:?}", rule, existing_rule);
+                    soroban_sdk::log!(
+                        &env,
+                        "Rule conflict: attempted to add rule {:?} which conflicts with existing rule {:?}",
+                        rule,
+                        existing_rule
+                    );
                     return Err(ContractError::RuleConflict);
                 }
             }
@@ -181,7 +140,6 @@ impl RegulatoryCheck {
 
     /// Returns true if two rules are logically equivalent or would cause enforcement ambiguity.
     fn rules_conflict(a: &JurisdictionRule, b: &JurisdictionRule) -> bool {
-        // Consider rules conflicting if all key parameters match (except rule_id/description)
         a.source_jur == b.source_jur
             && a.dest_jur == b.dest_jur
             && a.host_jur == b.host_jur
@@ -479,7 +437,6 @@ impl RegulatoryCheck {
             .get::<DataKey, PendingApproval>(&key)
         {
             let current_time = env.ledger().timestamp();
-            // Check if not expired and approved
             pending.approved && current_time <= pending.timestamp + 604800
         } else {
             false

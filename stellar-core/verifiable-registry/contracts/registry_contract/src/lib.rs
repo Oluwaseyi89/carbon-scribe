@@ -1,15 +1,19 @@
 #![no_std]
 
+mod errors;
 mod events;
 mod storage;
 mod types;
 mod validation;
 
-use events::{emit_anchorer_index_compacted_event, emit_document_anchored_event};
+use events::{
+    emit_anchorer_index_compacted_event, emit_document_anchored_event,
+    emit_owner_transferred_event,
+};
 use soroban_sdk::{contract, contractimpl, Address, Env, String, Vec};
 use storage::extend_instance_ttl;
 use types::{CompactionConfig, DocumentRecord, Error, PaginatedProjects};
-use validation::validate_ipfs_cid;
+use validation::{validate_address, validate_ipfs_cid};
 
 #[contract]
 pub struct ProjectRegistry;
@@ -55,6 +59,8 @@ impl ProjectRegistry {
             return Err(Error::ProjectAlreadyExists);
         }
 
+        validate_address(&owner)?;
+
         storage::set_project_owner(&env, &project_id, &owner);
         extend_instance_ttl(&env);
 
@@ -70,8 +76,110 @@ impl ProjectRegistry {
         let current_owner = storage::get_project_owner(&env, &project_id)?;
         current_owner.require_auth();
 
+        validate_address(&new_owner)?;
+
+        if new_owner == current_owner {
+            return Err(Error::SameOwner);
+        }
+
         storage::set_project_owner(&env, &project_id, &new_owner);
         extend_instance_ttl(&env);
+
+        emit_owner_transferred_event(&env, project_id, current_owner, new_owner);
+
+        Ok(())
+    }
+
+    /// Propose a two-step ownership transfer.
+    /// The current owner sets a pending target; the target must call `accept_ownership_transfer` to finalize.
+    pub fn propose_ownership_transfer(
+        env: Env,
+        project_id: String,
+        new_owner: Address,
+    ) -> Result<(), Error> {
+        let current_owner = storage::get_project_owner(&env, &project_id)?;
+        current_owner.require_auth();
+
+        validate_address(&new_owner)?;
+
+        if new_owner == current_owner {
+            return Err(Error::SameOwner);
+        }
+
+        if storage::has_pending_transfer(&env, &project_id) {
+            return Err(Error::PendingTransferExists);
+        }
+
+        storage::set_pending_transfer(&env, &project_id, &new_owner);
+        extend_instance_ttl(&env);
+
+        Ok(())
+    }
+
+    /// Accept a proposed ownership transfer.
+    /// Only the pending new owner can call this.
+    pub fn accept_ownership_transfer(env: Env, project_id: String) -> Result<(), Error> {
+        let pending_owner = storage::get_pending_transfer(&env, &project_id)?;
+        pending_owner.require_auth();
+
+        let old_owner = storage::get_project_owner(&env, &project_id)?;
+
+        storage::set_project_owner(&env, &project_id, &pending_owner);
+        storage::remove_pending_transfer(&env, &project_id);
+        extend_instance_ttl(&env);
+
+        emit_owner_transferred_event(&env, project_id, old_owner, pending_owner);
+
+        Ok(())
+    }
+
+    /// Cancel a pending ownership transfer (current owner only).
+    pub fn cancel_ownership_transfer(env: Env, project_id: String) -> Result<(), Error> {
+        let current_owner = storage::get_project_owner(&env, &project_id)?;
+        current_owner.require_auth();
+
+        if !storage::has_pending_transfer(&env, &project_id) {
+            return Err(Error::NoPendingTransfer);
+        }
+
+        storage::remove_pending_transfer(&env, &project_id);
+        extend_instance_ttl(&env);
+
+        Ok(())
+    }
+
+    /// View the pending ownership transfer target for a project.
+    pub fn get_pending_ownership_transfer(
+        env: Env,
+        project_id: String,
+    ) -> Result<Address, Error> {
+        storage::get_pending_transfer(&env, &project_id)
+    }
+
+    /// Admin override to recover project ownership.
+    /// Allows the contract admin to reassign ownership in case the project was
+    /// transferred to an invalid or uncontrolled address.
+    pub fn admin_override_ownership(
+        env: Env,
+        project_id: String,
+        new_owner: Address,
+    ) -> Result<(), Error> {
+        let admin = storage::get_admin(&env)?;
+        admin.require_auth();
+
+        validate_address(&new_owner)?;
+
+        let old_owner = storage::get_project_owner(&env, &project_id)?;
+
+        if new_owner == old_owner {
+            return Err(Error::SameOwner);
+        }
+
+        storage::set_project_owner(&env, &project_id, &new_owner);
+        storage::remove_pending_transfer(&env, &project_id);
+        extend_instance_ttl(&env);
+
+        emit_owner_transferred_event(&env, project_id, old_owner, new_owner);
 
         Ok(())
     }

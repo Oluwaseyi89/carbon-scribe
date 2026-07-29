@@ -61,15 +61,69 @@ const STATUS_CODE_TO_ERROR: Record<number, ErrorCode> = {
 };
 
 /**
+ * Extract human-readable error title or message from HTML error pages (502, 504, proxy errors)
+ */
+export function extractHtmlErrorMessage(html: string): string | undefined {
+  if (!html || typeof html !== 'string') return undefined;
+
+  const trimmed = html.trim();
+  const isHtml =
+    trimmed.toLowerCase().startsWith('<!doctype html') ||
+    trimmed.toLowerCase().startsWith('<html') ||
+    /<[a-z][\s\S]*>/i.test(trimmed);
+
+  if (!isHtml) return undefined;
+
+  // Extract from <title>...</title>
+  const titleMatch = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
+  if (titleMatch && titleMatch[1]?.trim()) {
+    const cleanTitle = titleMatch[1].replace(/<[^>]+>/g, '').trim();
+    if (cleanTitle) {
+      return cleanTitle;
+    }
+  }
+
+  // Extract from <h1>...</h1>
+  const h1Match = html.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i);
+  if (h1Match && h1Match[1]?.trim()) {
+    const cleanH1 = h1Match[1].replace(/<[^>]+>/g, '').trim();
+    if (cleanH1) {
+      return cleanH1;
+    }
+  }
+
+  // Strip HTML tags to get text content, truncated if very long
+  const strippedText = html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+  if (strippedText) {
+    return strippedText.length > 200 ? `${strippedText.slice(0, 200)}...` : strippedText;
+  }
+
+  return undefined;
+}
+
+/**
  * Extract message from various error envelope shapes
  */
 function extractMessage(body: unknown, statusCode?: number): string {
   if (typeof body === 'string') {
+    const htmlMessage = extractHtmlErrorMessage(body);
+    if (htmlMessage) {
+      return htmlMessage;
+    }
     return body;
   }
 
   if (typeof body === 'object' && body !== null) {
     const obj = body as Record<string, unknown>;
+
+    // Shape: { raw: string } - non-JSON text/HTML response fallback
+    if (typeof obj.raw === 'string') {
+      const htmlMessage = extractHtmlErrorMessage(obj.raw);
+      if (htmlMessage) {
+        return htmlMessage;
+      }
+      return obj.raw;
+    }
 
     // Shape: { message: string }
     if (typeof obj.message === 'string') {

@@ -21,4 +21,8 @@ pub enum DataKey {
     Status(u32),
     QualityScore(u32),
     Burned(u32),
+    // Mint cap controls (issue #472)
+    MaxSupply,
+    TotalMinted,
+    MintingFrozen,
 }

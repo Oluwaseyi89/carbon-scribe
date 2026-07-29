@@ -1,10 +1,13 @@
 #![cfg(test)]
 
 use soroban_sdk::testutils::Ledger;
-use soroban_sdk::{testutils::Address as _, Address, Env, String as SorobanString, Vec};
+use soroban_sdk::{
+    testutils::{Address as _, Events},
+    Address, Env, String as SorobanString, Vec,
+};
 
 use crate::types::{CompactionConfig, Error, PaginatedProjects};
-use crate::validation::validate_ipfs_cid;
+use crate::validation::{validate_address, validate_ipfs_cid};
 use crate::storage;
 use crate::{ProjectRegistry, ProjectRegistryClient};
 
@@ -812,4 +815,256 @@ fn test_auto_compaction_disabled_does_not_trigger() {
 
     let size = client.get_anchorer_index_size(&anchorer);
     assert_eq!(size, 2, "Auto-compaction disabled so size should still be 2");
+}
+
+// ========== Address Validation Tests ==========
+
+#[test]
+#[should_panic(expected = "Error(Contract, #12)")]
+fn test_transfer_to_contract_address_rejected() {
+    let (env, _, client) = create_contract();
+    let admin = Address::generate(&env);
+    let owner = Address::generate(&env);
+    let project_id = SorobanString::from_str(&env, "PROJ-001");
+
+    // Register a separate contract to use its address as an invalid destination
+    let contract_id = env.register(ProjectRegistry, ());
+
+    client.initialize(&admin);
+    client.register_project(&project_id, &owner);
+
+    // Transfer to a contract address should fail
+    client.transfer_project_ownership(&project_id, &contract_id);
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #13)")]
+fn test_transfer_to_same_owner_rejected() {
+    let (env, _, client) = create_contract();
+    let admin = Address::generate(&env);
+    let owner = Address::generate(&env);
+    let project_id = SorobanString::from_str(&env, "PROJ-001");
+
+    client.initialize(&admin);
+    client.register_project(&project_id, &owner);
+
+    // Transfer to the same owner should fail
+    client.transfer_project_ownership(&project_id, &owner);
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #12)")]
+fn test_register_project_with_contract_address_rejected() {
+    let (env, _, client) = create_contract();
+    let admin = Address::generate(&env);
+    let project_id = SorobanString::from_str(&env, "PROJ-001");
+
+    // Register a separate contract to use its address as an invalid owner
+    let contract_id = env.register(ProjectRegistry, ());
+
+    client.initialize(&admin);
+
+    // Register with a contract address as owner should fail
+    client.register_project(&project_id, &contract_id);
+}
+
+#[test]
+fn test_owner_transferred_event_emitted() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let contract_id = env.register(ProjectRegistry, ());
+    let client = ProjectRegistryClient::new(&env, &contract_id);
+
+    let admin = Address::generate(&env);
+    let original_owner = Address::generate(&env);
+    let new_owner = Address::generate(&env);
+    let project_id = SorobanString::from_str(&env, "PROJ-001");
+
+    client.initialize(&admin);
+    client.register_project(&project_id, &original_owner);
+
+    client.transfer_project_ownership(&project_id, &new_owner);
+
+    let events = env.events().all();
+    let last = events.get(events.len() - 1).unwrap();
+
+    assert_eq!(last.0, contract_id);
+    assert_eq!(last.1.len(), 1, "OwnerTransferred should have 1 topic");
+}
+
+// ========== Two-Step Ownership Transfer Tests ==========
+
+#[test]
+fn test_two_step_ownership_transfer() {
+    let (env, _, client) = create_contract();
+    let admin = Address::generate(&env);
+    let original_owner = Address::generate(&env);
+    let new_owner = Address::generate(&env);
+    let project_id = SorobanString::from_str(&env, "PROJ-001");
+
+    client.initialize(&admin);
+    client.register_project(&project_id, &original_owner);
+
+    // Step 1: Propose transfer
+    client.propose_ownership_transfer(&project_id, &new_owner);
+
+    let pending = client.get_pending_ownership_transfer(&project_id);
+    assert_eq!(pending, new_owner);
+
+    // Step 2: Accept transfer
+    client.accept_ownership_transfer(&project_id);
+
+    let owner = client.get_project_owner(&project_id);
+    assert_eq!(owner, new_owner);
+
+    // Verify pending is cleared
+    let result = client.try_get_pending_ownership_transfer(&project_id);
+    assert!(result.is_err());
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #14)")]
+fn test_double_propose_rejected() {
+    let (env, _, client) = create_contract();
+    let admin = Address::generate(&env);
+    let owner = Address::generate(&env);
+    let new_owner1 = Address::generate(&env);
+    let new_owner2 = Address::generate(&env);
+    let project_id = SorobanString::from_str(&env, "PROJ-001");
+
+    client.initialize(&admin);
+    client.register_project(&project_id, &owner);
+
+    client.propose_ownership_transfer(&project_id, &new_owner1);
+    // Second proposal should fail
+    client.propose_ownership_transfer(&project_id, &new_owner2);
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #13)")]
+fn test_propose_to_same_owner_rejected() {
+    let (env, _, client) = create_contract();
+    let admin = Address::generate(&env);
+    let owner = Address::generate(&env);
+    let project_id = SorobanString::from_str(&env, "PROJ-001");
+
+    client.initialize(&admin);
+    client.register_project(&project_id, &owner);
+
+    client.propose_ownership_transfer(&project_id, &owner);
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #12)")]
+fn test_propose_to_contract_address_rejected() {
+    let (env, _, client) = create_contract();
+    let admin = Address::generate(&env);
+    let owner = Address::generate(&env);
+    let project_id = SorobanString::from_str(&env, "PROJ-001");
+
+    let contract_id = env.register(ProjectRegistry, ());
+
+    client.initialize(&admin);
+    client.register_project(&project_id, &owner);
+
+    client.propose_ownership_transfer(&project_id, &contract_id);
+}
+
+#[test]
+fn test_cancel_ownership_transfer() {
+    let (env, _, client) = create_contract();
+    let admin = Address::generate(&env);
+    let owner = Address::generate(&env);
+    let new_owner = Address::generate(&env);
+    let project_id = SorobanString::from_str(&env, "PROJ-001");
+
+    client.initialize(&admin);
+    client.register_project(&project_id, &owner);
+
+    client.propose_ownership_transfer(&project_id, &new_owner);
+    client.cancel_ownership_transfer(&project_id);
+
+    // The owner should still be the original
+    let current_owner = client.get_project_owner(&project_id);
+    assert_eq!(current_owner, owner);
+
+    // Pending should be cleared
+    let result = client.try_cancel_ownership_transfer(&project_id);
+    assert!(result.is_err());
+}
+
+// ========== Admin Override Tests ==========
+
+#[test]
+fn test_admin_override_ownership() {
+    let (env, _, client) = create_contract();
+    let admin = Address::generate(&env);
+    let owner = Address::generate(&env);
+    let recovered_owner = Address::generate(&env);
+    let project_id = SorobanString::from_str(&env, "PROJ-001");
+
+    client.initialize(&admin);
+    client.register_project(&project_id, &owner);
+
+    // Admin recovers ownership to a new address
+    client.admin_override_ownership(&project_id, &recovered_owner);
+
+    let current_owner = client.get_project_owner(&project_id);
+    assert_eq!(current_owner, recovered_owner);
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #12)")]
+fn test_admin_override_to_contract_address_rejected() {
+    let (env, _, client) = create_contract();
+    let admin = Address::generate(&env);
+    let owner = Address::generate(&env);
+    let project_id = SorobanString::from_str(&env, "PROJ-001");
+
+    let contract_id = env.register(ProjectRegistry, ());
+
+    client.initialize(&admin);
+    client.register_project(&project_id, &owner);
+
+    client.admin_override_ownership(&project_id, &contract_id);
+}
+
+#[test]
+fn test_state_unchanged_after_failed_transfer() {
+    let (env, _, client) = create_contract();
+    let admin = Address::generate(&env);
+    let owner = Address::generate(&env);
+    let project_id = SorobanString::from_str(&env, "PROJ-001");
+
+    let contract_id = env.register(ProjectRegistry, ());
+
+    client.initialize(&admin);
+    client.register_project(&project_id, &owner);
+
+    // Attempt invalid transfer (should return Err and leave state unchanged)
+    let result = client.try_transfer_project_ownership(&project_id, &contract_id);
+    assert!(result.is_err());
+
+    // State must remain unchanged
+    let current_owner = client.get_project_owner(&project_id);
+    assert_eq!(current_owner, owner);
+}
+
+#[test]
+fn test_validate_address_rejects_contract() {
+    let env = Env::default();
+    let contract_id = env.register(ProjectRegistry, ());
+
+    let result = validate_address(&contract_id);
+    assert_eq!(result, Err(Error::InvalidAddress));
+}
+
+#[test]
+fn test_validate_address_accepts_account() {
+    let env = Env::default();
+    let account = Address::generate(&env);
+
+    let result = validate_address(&account);
+    assert_eq!(result, Ok(()));
 }

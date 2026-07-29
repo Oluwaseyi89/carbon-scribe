@@ -1,4 +1,4 @@
-use crate::{OperationType, JurisdictionRule};
+use crate::storage::{JurisdictionRule, OperationType};
 use soroban_sdk::{contractevent, Address, Bytes, Env, String};
 
 /// A deterministic hash of a JurisdictionRule used for change detection.
@@ -47,6 +47,22 @@ fn append_string(env: &Env, bytes: &mut Bytes, s: &String) {
     bytes.push_back(0u8);
 }
 
+/// Event emitted when contract is successfully initialized
+#[contractevent]
+pub struct Initialized {
+    pub admin: Address,
+    pub governance: Address,
+    pub carbon_asset_contract: Address,
+    pub timestamp: u64,
+}
+
+/// Event emitted when an unauthorized or blocked re-initialization is attempted
+#[contractevent]
+pub struct ReinitializationAttempted {
+    pub attempted_by: Address,
+    pub timestamp: u64,
+}
+
 /// Event emitted when a new regulatory rule is added
 #[contractevent]
 pub struct RuleAdded {
@@ -77,6 +93,31 @@ pub struct RuleDeactivated {
     pub rule_id: String,
     pub deactivated_by: Address,
     pub timestamp: u64,
+}
+
+/// Emit an Initialized event
+pub fn emit_initialized_event(
+    env: &Env,
+    admin: Address,
+    governance: Address,
+    carbon_asset_contract: Address,
+) {
+    Initialized {
+        admin,
+        governance,
+        carbon_asset_contract,
+        timestamp: env.ledger().timestamp(),
+    }
+    .publish(env);
+}
+
+/// Emit a ReinitializationAttempted event
+pub fn emit_reinitialization_attempted_event(env: &Env, attempted_by: Address) {
+    ReinitializationAttempted {
+        attempted_by,
+        timestamp: env.ledger().timestamp(),
+    }
+    .publish(env);
 }
 
 /// Emit a RuleAdded event
@@ -124,11 +165,7 @@ pub fn emit_rule_updated_event(
 }
 
 /// Emit a RuleDeactivated event
-pub fn emit_rule_deactivated_event(
-    env: &Env,
-    rule_id: String,
-    deactivated_by: Address,
-) {
+pub fn emit_rule_deactivated_event(env: &Env, rule_id: String, deactivated_by: Address) {
     RuleDeactivated {
         rule_id,
         deactivated_by,

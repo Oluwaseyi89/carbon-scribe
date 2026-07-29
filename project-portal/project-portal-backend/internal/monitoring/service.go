@@ -2,11 +2,13 @@ package monitoring
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
 
 	"carbon-scribe/project-portal/project-portal-backend/internal/monitoring/ingestion"
+	"carbon-scribe/project-portal/project-portal-backend/internal/monitoring/processing"
 )
 
 // Service orchestrates monitoring data ingestion and retrieval.
@@ -15,6 +17,7 @@ type Service struct {
 	webhookPipeline *ingestion.WebhookPipeline
 	iotPipeline     *ingestion.IoTPipeline
 	repo            Repository
+	tileCache       *TileCache
 }
 
 // NewService constructs a monitoring Service.
@@ -24,6 +27,7 @@ func NewService(repo Repository) *Service {
 		webhookPipeline: ingestion.NewWebhookPipeline(repo),
 		iotPipeline:     ingestion.NewIoTPipeline(repo),
 		repo:            repo,
+		tileCache:       NewTileCache(24 * time.Hour),
 	}
 }
 
@@ -55,6 +59,76 @@ func (s *Service) ListReadings(ctx context.Context, projectID string, limit int)
 		limit = 50
 	}
 	return s.repo.ListByProject(ctx, projectID, limit)
+}
+
+// GetNDVITile retrieves or generates a tile for NDVI.
+func (s *Service) GetNDVITile(ctx context.Context, projectID, z, x, y string, start, end time.Time, useMVT bool) ([]byte, error) {
+	cacheKey := fmt.Sprintf("tile_%s_%s_%s_%s_%d_%d_%v", projectID, z, x, y, start.Unix(), end.Unix(), useMVT)
+	
+	if cached, found := s.tileCache.Get(cacheKey); found {
+		return cached, nil
+	}
+	
+	limit := 1
+	readings, err := s.repo.ListByProject(ctx, projectID, limit)
+	if err != nil || len(readings) == 0 {
+		emptyResult := processing.NDVIResult{Width: 256, Height: 256}
+		if useMVT {
+			return processing.GenerateMVTTile(emptyResult)
+		}
+		return processing.GeneratePNGTile(emptyResult, 256, 256)
+	}
+
+	// Mock computing NDVI from satellite reading
+	width, height := 256, 256
+	pixels := make([]float64, width*height)
+	val := 0.0
+	if readings[0].NDVIMean != nil {
+		val = *readings[0].NDVIMean
+	}
+	for i := range pixels {
+		pixels[i] = val
+	}
+	ndviRes := processing.NDVIResult{
+		Pixels: pixels,
+		Width:  width,
+		Height: height,
+		Mean:   val,
+	}
+	
+	var tileData []byte
+	if useMVT {
+		tileData, err = processing.GenerateMVTTile(ndviRes)
+	} else {
+		tileData, err = processing.GeneratePNGTile(ndviRes, width, height)
+	}
+	if err != nil {
+		return nil, err
+	}
+	
+	s.tileCache.Set(cacheKey, tileData)
+	return tileData, nil
+}
+
+// GetNDVITimeSeriesAnimation generates a time-series animation (JSON format for tiles)
+func (s *Service) GetNDVITimeSeriesAnimation(ctx context.Context, projectID, z, x, y string, start, end time.Time) (map[string]interface{}, error) {
+	return map[string]interface{}{
+		"project_id": projectID,
+		"z":          z,
+		"x":          x,
+		"y":          y,
+		"tiles": []map[string]interface{}{
+			{
+				"timestamp": start.Format(time.RFC3339),
+				"url": fmt.Sprintf(
+					"/api/v1/monitoring/ndvi/tile/%s/%s/%s?project_id=%s&date_start=%s&date_end=%s",
+					z, x, y, projectID,
+					start.Format(time.RFC3339),
+					start.Add(24*time.Hour).Format(time.RFC3339),
+				),
+			},
+		},
+	}, nil
 }
 
 // ============================================================================

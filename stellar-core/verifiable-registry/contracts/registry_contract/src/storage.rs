@@ -25,6 +25,8 @@ pub enum StorageKey {
     AnchorerLastActivity(Address),
     /// Last document timestamp per project (project_id -> u64) for pruning decisions
     ProjectLastDocumentTimestamp(String),
+    /// Pending ownership transfer target (project_id -> Address)
+    PendingOwnershipTransfer(String),
 }
 
 /// Extend the TTL of instance storage
@@ -320,6 +322,34 @@ pub fn compact_anchorer_index(
         pruned_projects: pruned,
         remaining_projects: compacted.len(),
     }
+}
+
+// ========== Pending Ownership Transfer ==========
+
+pub fn set_pending_transfer(env: &Env, project_id: &String, new_owner: &Address) {
+    let key = StorageKey::PendingOwnershipTransfer(project_id.clone());
+    env.storage().temporary().set(&key, new_owner);
+    env.storage()
+        .temporary()
+        .extend_ttl(&key, INSTANCE_LIFETIME_THRESHOLD, INSTANCE_BUMP_AMOUNT);
+}
+
+pub fn get_pending_transfer(env: &Env, project_id: &String) -> Result<Address, Error> {
+    let key = StorageKey::PendingOwnershipTransfer(project_id.clone());
+    env.storage()
+        .temporary()
+        .get(&key)
+        .ok_or(Error::NoPendingTransfer)
+}
+
+pub fn has_pending_transfer(env: &Env, project_id: &String) -> bool {
+    let key = StorageKey::PendingOwnershipTransfer(project_id.clone());
+    env.storage().temporary().has(&key)
+}
+
+pub fn remove_pending_transfer(env: &Env, project_id: &String) {
+    let key = StorageKey::PendingOwnershipTransfer(project_id.clone());
+    env.storage().temporary().remove(&key);
 }
 
 /// Check if auto-compaction should be triggered after an index write.

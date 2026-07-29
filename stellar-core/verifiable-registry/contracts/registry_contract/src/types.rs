@@ -1,4 +1,4 @@
-use soroban_sdk::{contracterror, contracttype, Address, String, Vec};
+use soroban_sdk::{contracttype, Address, String, Vec};
 
 /// Document record structure storing metadata about an anchored document
 #[contracttype]
@@ -39,31 +39,4 @@ pub struct PaginatedProjects {
     pub next_cursor: Option<u32>,
 }
 
-/// Contract error types
-#[contracterror]
-#[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
-#[repr(u32)]
-pub enum Error {
-    /// Contract already initialized
-    AlreadyInitialized = 1,
-    /// Admin not found
-    AdminNotFound = 2,
-    /// Project not found
-    ProjectNotFound = 3,
-    /// Project already exists
-    ProjectAlreadyExists = 4,
-    /// No documents found for project
-    NoDocumentsFound = 5,
-    /// Invalid IPFS CID format
-    InvalidCidFormat = 6,
-    /// Empty batch provided
-    EmptyBatch = 7,
-    /// No projects found for anchorer
-    NoProjectsFound = 8,
-    /// Timestamp is not strictly greater than the last recorded timestamp (anti-backdate)
-    TimestampNotMonotonic = 9,
-    /// Compaction is already in progress
-    CompactionInProgress = 10,
-    /// Invalid compaction configuration parameters
-    InvalidCompactionConfig = 11,
-}
+pub use crate::errors::Error;

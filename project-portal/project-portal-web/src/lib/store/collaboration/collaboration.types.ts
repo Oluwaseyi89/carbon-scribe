@@ -202,6 +202,7 @@ export interface CollaborationSlice {
   comments: Comment[];
   tasks: Task[];
   resources: SharedResource[];
+  updatingTaskIds: string[];
 
   // Loading & errors (prefixed to avoid clashing with projects slice)
   collaborationLoading: CollaborationLoadingState;

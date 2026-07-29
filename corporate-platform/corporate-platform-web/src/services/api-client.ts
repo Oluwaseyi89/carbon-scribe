@@ -4,6 +4,7 @@ import { withRetry, isRetryableError, RetryOptions, generateIdempotencyKey } fro
 import { requestQueue } from '@/lib/utils/requestQueue';
 import { reportError } from '@/lib/telemetry/errorReporter';
 import { requestManager } from '@/lib/api/requestManager';
+import { parseResponseBody } from '@/lib/api/responseParser';
 
 /**
  * Base API Client for handling HTTP requests
@@ -159,15 +160,47 @@ class ApiClient {
           requestManager.unregisterRequest(requestKey);
         }
 
-        const data = await response.json();
+        const parsedResponse = await parseResponseBody<T>(response);
+
+        // Telemetry warning tracking for non-JSON responses
+        if (!parsedResponse.isJson && !parsedResponse.isEmpty && !parsedResponse.isBinary) {
+          reportError(
+            `Received non-JSON response (${parsedResponse.contentType || 'unknown'}) for ${method} ${endpoint}`,
+            'api-client',
+            'warning',
+            {
+              endpoint,
+              status: response.status,
+              contentType: parsedResponse.contentType,
+              bodyPreview: parsedResponse.preview,
+              isHtml: parsedResponse.isHtml,
+            },
+          );
+        }
 
         if (!response.ok) {
-          const parsedError = parseApiError(data, response.status);
+          const errorBody = parsedResponse.data ?? parsedResponse.raw;
+          const parsedError = parseApiError(errorBody, response.status);
           
+          reportError(
+            parsedError.message,
+            'api-client',
+            response.status >= 500 ? 'error' : 'warning',
+            {
+              endpoint,
+              status: response.status,
+              contentType: parsedResponse.contentType,
+              bodyPreview: parsedResponse.preview,
+            },
+          );
+
           // Check if this is a retryable error (5xx, 408, 429)
           const isRetryable = response.status >= 500 || response.status === 408 || response.status === 429;
           if (isRetryable) {
-            throw new Error(parsedError.message);
+            const err = new Error(parsedError.message) as any;
+            err.status = response.status;
+            err.statusCode = response.status;
+            throw err;
           }
           
           return {
@@ -179,7 +212,24 @@ class ApiClient {
           };
         }
 
-        return data as ApiResponse<T>;
+        if (
+          parsedResponse.data &&
+          typeof parsedResponse.data === 'object' &&
+          'success' in (parsedResponse.data as Record<string, unknown>)
+        ) {
+          return {
+            statusCode: response.status,
+            timestamp: new Date().toISOString(),
+            ...(parsedResponse.data as Record<string, unknown>),
+          } as ApiResponse<T>;
+        }
+
+        return {
+          success: true,
+          data: parsedResponse.isEmpty ? undefined : (parsedResponse.data as T),
+          statusCode: response.status,
+          timestamp: new Date().toISOString(),
+        };
       } catch (error: any) {
         if (error.name === 'AbortError') {
           console.log(`[ApiClient] Request to ${endpoint} cancelled`);
@@ -195,7 +245,7 @@ class ApiClient {
           };
         }
         
-        const parsedError = parseApiError(error);
+        const parsedError = parseApiError(error, error?.status ?? error?.statusCode);
         
         // Check if this is a retryable network error
         if (isRetryableError(error, 0)) {
@@ -231,6 +281,7 @@ class ApiClient {
         return {
           success: false,
           error: parsedError.message,
+          statusCode: error?.statusCode ?? error?.status ?? parsedError.statusCode,
           timestamp: new Date().toISOString(),
           parsedError,
         };

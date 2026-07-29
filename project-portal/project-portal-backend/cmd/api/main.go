@@ -177,7 +177,7 @@ func main() {
 	collaborationHandler := collaboration.NewHandler(collaborationService)
 
 	geospatialRepo := geospatial.NewRepository(db)
-	geospatialService := geospatial.NewService(geospatialRepo)
+	geospatialService := geospatial.NewService(geospatialRepo, db)
 	geospatialHandler := geospatial.NewHandler(geospatialService)
 	financingRepo := financing.NewRepository(db)
 	financingService := financing.NewService(financingRepo, methodologyService, methodologyCapService)

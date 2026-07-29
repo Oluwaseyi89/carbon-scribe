@@ -62,3 +62,28 @@ pub struct Sep41BurnEvent {
     pub from: Address,
     pub amount: i128,
 }
+
+// Mint cap events (issue #472)
+
+/// Emitted when the contract-level max supply is configured by the admin.
+#[contractevent]
+pub struct MintCapSetEvent {
+    pub sequence: u64,
+    pub max_supply: u32,
+    pub set_by: Address,
+}
+
+/// Emitted when the max supply cap is reached during a mint operation.
+#[contractevent]
+pub struct MintCapReachedEvent {
+    pub sequence: u64,
+    pub total_minted: u32,
+    pub max_supply: u32,
+}
+
+/// Emitted when an admin permanently freezes minting.
+#[contractevent]
+pub struct MintingFrozenEvent {
+    pub sequence: u64,
+    pub frozen_by: Address,
+}

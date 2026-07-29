@@ -11,8 +11,8 @@ use soroban_sdk::{contract, contractimpl, Address, Env, IntoVal, String, Symbol,
 
 use crate::errors::ContractError;
 use crate::events::{
-    ApproveEvent, MintEvent, QualityScoreUpdatedEvent, Sep41BurnEvent, Sep41TransferEvent,
-    StatusChangeEvent, TransferEvent,
+    ApproveEvent, MintCapReachedEvent, MintCapSetEvent, MintEvent, MintingFrozenEvent,
+    QualityScoreUpdatedEvent, Sep41BurnEvent, Sep41TransferEvent, StatusChangeEvent, TransferEvent,
 };
 use crate::storage::DataKey;
 use crate::types::{AllowanceData, AssetStatus, CarbonAssetMetadata, OperationType, ValidationResult};
@@ -56,6 +56,11 @@ impl CarbonAsset {
             .set(&DataKey::HostJurisdiction, &host_jurisdiction);
         env.storage().instance().set(&DataKey::NextTokenId, &1u32);
         env.storage().instance().set(&DataKey::EventSequence, &0u64);
+        // Initialise mint cap tracking counters
+        env.storage().instance().set(&DataKey::TotalMinted, &0u32);
+        env.storage()
+            .instance()
+            .set(&DataKey::MintingFrozen, &false);
 
         Ok(())
     }
@@ -76,6 +81,52 @@ impl CarbonAsset {
             return Err(ContractError::NotAuthorized);
         }
 
+        // --- Mint cap enforcement (issue #472) ---
+
+        // 1. Check minting freeze flag
+        let frozen: bool = env
+            .storage()
+            .instance()
+            .get(&DataKey::MintingFrozen)
+            .unwrap_or(false);
+        if frozen {
+            return Err(ContractError::MintingIsFrozen);
+        }
+
+        // 2. Fetch current total minted count
+        let total_minted: u32 = env
+            .storage()
+            .instance()
+            .get(&DataKey::TotalMinted)
+            .unwrap_or(0u32);
+
+        // 3. Check contract-level max supply cap if set
+        let max_supply_opt: Option<u32> = env.storage().instance().get(&DataKey::MaxSupply);
+        if let Some(max_supply) = max_supply_opt {
+            if total_minted >= max_supply {
+                // Emit cap-reached event before returning error
+                let sequence: u64 = env
+                    .storage()
+                    .instance()
+                    .get(&DataKey::EventSequence)
+                    .unwrap_or(0u64);
+                let cap_seq = sequence + 1;
+                env.storage()
+                    .instance()
+                    .set(&DataKey::EventSequence, &cap_seq);
+                MintCapReachedEvent {
+                    sequence: cap_seq,
+                    total_minted,
+                    max_supply,
+                }
+                .publish(&env);
+
+                return Err(ContractError::SupplyLimitExceeded);
+            }
+        }
+
+        // --- Actual token minting ---
+
         let token_id: u32 = env
             .storage()
             .instance()
@@ -85,6 +136,11 @@ impl CarbonAsset {
         env.storage()
             .instance()
             .set(&DataKey::NextTokenId, &(token_id + 1));
+
+        // Increment total minted counter
+        env.storage()
+            .instance()
+            .set(&DataKey::TotalMinted, &(total_minted + 1));
 
         env.storage()
             .persistent()
@@ -139,6 +195,27 @@ impl CarbonAsset {
             changed_by: caller,
         }
         .publish(&env);
+
+        // Emit cap-reached event if we just hit the cap exactly
+        if let Some(max_supply) = max_supply_opt {
+            if total_minted + 1 == max_supply {
+                let sequence: u64 = env
+                    .storage()
+                    .instance()
+                    .get(&DataKey::EventSequence)
+                    .unwrap_or(0u64);
+                let cap_seq = sequence + 1;
+                env.storage()
+                    .instance()
+                    .set(&DataKey::EventSequence, &cap_seq);
+                MintCapReachedEvent {
+                    sequence: cap_seq,
+                    total_minted: total_minted + 1,
+                    max_supply,
+                }
+                .publish(&env);
+            }
+        }
 
         Ok(token_id)
     }
@@ -494,6 +571,97 @@ impl CarbonAsset {
     }
 
     // ====================================================================
+    // Mint Cap Admin Functions (issue #472)
+    // ====================================================================
+
+    /// Set the contract-level maximum supply (mint cap).
+    ///
+    /// Rules:
+    /// - Only the admin may call this.
+    /// - The cap can only be set **once** (immutable after first set).
+    /// - The cap cannot be set below the current `TotalMinted` count.
+    pub fn set_max_supply(
+        env: Env,
+        caller: Address,
+        max_supply: u32,
+    ) -> Result<(), ContractError> {
+        caller.require_auth();
+        let admin = Self::get_admin(env.clone())?;
+        if caller != admin {
+            return Err(ContractError::NotAuthorized);
+        }
+
+        // Immutability: cap can only be set once
+        if env.storage().instance().has(&DataKey::MaxSupply) {
+            return Err(ContractError::MaxSupplyAlreadySet);
+        }
+
+        // Cap must be at or above the current total minted
+        let total_minted: u32 = env
+            .storage()
+            .instance()
+            .get(&DataKey::TotalMinted)
+            .unwrap_or(0u32);
+        if max_supply < total_minted {
+            return Err(ContractError::MaxSupplyBelowMinted);
+        }
+
+        env.storage()
+            .instance()
+            .set(&DataKey::MaxSupply, &max_supply);
+
+        let sequence: u64 = env
+            .storage()
+            .instance()
+            .get(&DataKey::EventSequence)
+            .unwrap_or(0u64);
+        let next_sequence = sequence + 1;
+        env.storage()
+            .instance()
+            .set(&DataKey::EventSequence, &next_sequence);
+        MintCapSetEvent {
+            sequence: next_sequence,
+            max_supply,
+            set_by: caller,
+        }
+        .publish(&env);
+
+        Ok(())
+    }
+
+    /// Permanently freeze minting. Once frozen, no further tokens can be minted.
+    /// This is a one-way, irreversible operation restricted to the admin.
+    pub fn freeze_minting(env: Env, caller: Address) -> Result<(), ContractError> {
+        caller.require_auth();
+        let admin = Self::get_admin(env.clone())?;
+        if caller != admin {
+            return Err(ContractError::NotAuthorized);
+        }
+
+        // Already frozen is a no-op to keep things idempotent, but we still emit event
+        env.storage()
+            .instance()
+            .set(&DataKey::MintingFrozen, &true);
+
+        let sequence: u64 = env
+            .storage()
+            .instance()
+            .get(&DataKey::EventSequence)
+            .unwrap_or(0u64);
+        let next_sequence = sequence + 1;
+        env.storage()
+            .instance()
+            .set(&DataKey::EventSequence, &next_sequence);
+        MintingFrozenEvent {
+            sequence: next_sequence,
+            frozen_by: caller,
+        }
+        .publish(&env);
+
+        Ok(())
+    }
+
+    // ====================================================================
     // Getters
     // ====================================================================
 
@@ -563,6 +731,45 @@ impl CarbonAsset {
             .instance()
             .get(&DataKey::EventSequence)
             .unwrap_or(0u64)
+    }
+
+    /// Returns the configured maximum supply cap, or None if no cap has been set.
+    pub fn get_max_supply(env: Env) -> Option<u32> {
+        env.storage().instance().get(&DataKey::MaxSupply)
+    }
+
+    /// Returns the total number of tokens minted so far.
+    pub fn get_total_minted(env: Env) -> u32 {
+        env.storage()
+            .instance()
+            .get(&DataKey::TotalMinted)
+            .unwrap_or(0u32)
+    }
+
+    /// Returns the number of tokens that can still be minted before the cap is
+    /// reached. Returns None if no cap has been configured.
+    pub fn get_remaining_supply(env: Env) -> Option<u32> {
+        let max_supply: Option<u32> = env.storage().instance().get(&DataKey::MaxSupply);
+        max_supply.map(|cap| {
+            let minted: u32 = env
+                .storage()
+                .instance()
+                .get(&DataKey::TotalMinted)
+                .unwrap_or(0u32);
+            if minted >= cap {
+                0u32
+            } else {
+                cap - minted
+            }
+        })
+    }
+
+    /// Returns true if minting has been permanently frozen by the admin.
+    pub fn is_minting_frozen(env: Env) -> bool {
+        env.storage()
+            .instance()
+            .get(&DataKey::MintingFrozen)
+            .unwrap_or(false)
     }
 
     pub fn owner_of(env: Env, token_id: u32) -> Result<Address, ContractError> {

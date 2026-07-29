@@ -1,7 +1,7 @@
 #![cfg(test)]
 
 use super::*;
-use soroban_sdk::{testutils::Address as _, Address, Env, String, Bytes};
+use soroban_sdk::{testutils::Address as _, Address, Env, String};
 
 fn make_rule(
     env: &Env,
@@ -25,10 +25,37 @@ fn make_rule(
 }
 
 #[test]
-#[allow(deprecated)]
+fn test_is_initialized_and_reinitialization_guard() {
+    let env = Env::default();
+    let contract_id = env.register(RegulatoryCheck, ());
+    let client = RegulatoryCheckClient::new(&env, &contract_id);
+    let admin = Address::generate(&env);
+    let governance = Address::generate(&env);
+    let asset = Address::generate(&env);
+
+    // Before initialization
+    assert_eq!(client.is_initialized(), false);
+
+    // Perform initialization
+    env.mock_all_auths();
+    client.initialize(&admin, &governance, &asset);
+
+    // After initialization
+    assert_eq!(client.is_initialized(), true);
+
+    // Attempt re-initialization with different addresses (should fail with AlreadyInitialized)
+    let attacker = Address::generate(&env);
+    let res = client.try_initialize(&attacker, &attacker, &attacker);
+    assert!(matches!(res, Err(Ok(ContractError::AlreadyInitialized))));
+
+    // Verify contract remains initialized and uncompromised
+    assert_eq!(client.is_initialized(), true);
+}
+
+#[test]
 fn test_duplicate_rule_conflict() {
     let env = Env::default();
-    let contract_id = env.register_contract(None, RegulatoryCheck);
+    let contract_id = env.register(RegulatoryCheck, ());
     let client = RegulatoryCheckClient::new(&env, &contract_id);
     let admin = Address::generate(&env);
     let governance = Address::generate(&env);
@@ -47,10 +74,9 @@ fn test_duplicate_rule_conflict() {
 }
 
 #[test]
-#[allow(deprecated)]
 fn test_unique_rule_addition() {
     let env = Env::default();
-    let contract_id = env.register_contract(None, RegulatoryCheck);
+    let contract_id = env.register(RegulatoryCheck, ());
     let client = RegulatoryCheckClient::new(&env, &contract_id);
     let admin = Address::generate(&env);
     let governance = Address::generate(&env);
@@ -81,7 +107,7 @@ fn test_unique_rule_addition() {
 #[test]
 fn test_add_rule_emits_event() {
     let env = Env::default();
-    let contract_id = env.register_contract(None, RegulatoryCheck);
+    let contract_id = env.register(RegulatoryCheck, ());
     let client = RegulatoryCheckClient::new(&env, &contract_id);
     let admin = Address::generate(&env);
     let governance = Address::generate(&env);
@@ -92,8 +118,6 @@ fn test_add_rule_emits_event() {
     let rule = make_rule(&env, "R1", "US", "DE", "ANY", OperationType::TRANSFER, true);
     client.add_rule(&governance, &rule);
 
-    // Verify the event was emitted (no panic means success)
-    // The contract successfully executed, which means the event was published
     let stored = client.get_rule(&String::from_str(&env, "R1"));
     assert!(stored.is_some());
     assert_eq!(stored.unwrap().rule_id, String::from_str(&env, "R1"));
@@ -103,7 +127,7 @@ fn test_add_rule_emits_event() {
 #[test]
 fn test_update_rule_emits_event() {
     let env = Env::default();
-    let contract_id = env.register_contract(None, RegulatoryCheck);
+    let contract_id = env.register(RegulatoryCheck, ());
     let client = RegulatoryCheckClient::new(&env, &contract_id);
     let admin = Address::generate(&env);
     let governance = Address::generate(&env);
@@ -128,7 +152,6 @@ fn test_update_rule_emits_event() {
     };
     client.update_rule(&governance, &updated_rule);
 
-    // Verify the rule was updated
     let stored = client.get_rule(&String::from_str(&env, "R1"));
     assert!(stored.is_some());
     assert_eq!(stored.unwrap().is_allowed, false);
@@ -138,7 +161,7 @@ fn test_update_rule_emits_event() {
 #[test]
 fn test_deactivate_rule_emits_event() {
     let env = Env::default();
-    let contract_id = env.register_contract(None, RegulatoryCheck);
+    let contract_id = env.register(RegulatoryCheck, ());
     let client = RegulatoryCheckClient::new(&env, &contract_id);
     let admin = Address::generate(&env);
     let governance = Address::generate(&env);
@@ -166,7 +189,7 @@ fn test_deactivate_rule_emits_event() {
 #[test]
 fn test_rule_lifecycle_events() {
     let env = Env::default();
-    let contract_id = env.register_contract(None, RegulatoryCheck);
+    let contract_id = env.register(RegulatoryCheck, ());
     let client = RegulatoryCheckClient::new(&env, &contract_id);
     let admin = Address::generate(&env);
     let governance = Address::generate(&env);

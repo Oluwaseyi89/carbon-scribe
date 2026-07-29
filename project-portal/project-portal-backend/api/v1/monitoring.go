@@ -2,6 +2,7 @@ package v1
 
 import (
 	"net/http"
+	"time"
 
 	"carbon-scribe/project-portal/project-portal-backend/internal/monitoring"
 	"carbon-scribe/project-portal/project-portal-backend/internal/monitoring/ingestion"
@@ -191,6 +192,81 @@ func (h *MonitoringHandler) ListIoTReadings(c *gin.Context) {
 	})
 }
 
+// GetNDVITile handles GET /api/v1/monitoring/ndvi/tile/:z/:x/:y.
+func (h *MonitoringHandler) GetNDVITile(c *gin.Context) {
+	z := c.Param("z")
+	x := c.Param("x")
+	y := c.Param("y")
+	projectID := c.Query("project_id")
+	useMVT := c.Query("mvt") == "true"
+	
+	startStr := c.Query("date_start")
+	endStr := c.Query("date_end")
+	
+	start := time.Time{}
+	end := time.Now()
+	if startStr != "" {
+		if parsed, err := time.Parse(time.RFC3339, startStr); err == nil {
+			start = parsed
+		}
+	}
+	if endStr != "" {
+		if parsed, err := time.Parse(time.RFC3339, endStr); err == nil {
+			end = parsed
+		}
+	}
+
+	tileData, err := h.service.GetNDVITile(c.Request.Context(), projectID, z, x, y, start, end, useMVT)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	if tileData == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "tile not found"})
+		return
+	}
+
+	c.Header("Cache-Control", "public, max-age=86400")
+	if useMVT {
+		c.Data(http.StatusOK, "application/json", tileData)
+	} else {
+		c.Data(http.StatusOK, "image/png", tileData)
+	}
+}
+
+// GetNDVITimeSeriesAnimation handles GET /api/v1/monitoring/ndvi/timeseries/animation/:z/:x/:y.
+func (h *MonitoringHandler) GetNDVITimeSeriesAnimation(c *gin.Context) {
+	z := c.Param("z")
+	x := c.Param("x")
+	y := c.Param("y")
+	projectID := c.Query("project_id")
+	
+	startStr := c.Query("date_start")
+	endStr := c.Query("date_end")
+	
+	start := time.Time{}
+	end := time.Now()
+	if startStr != "" {
+		if parsed, err := time.Parse(time.RFC3339, startStr); err == nil {
+			start = parsed
+		}
+	}
+	if endStr != "" {
+		if parsed, err := time.Parse(time.RFC3339, endStr); err == nil {
+			end = parsed
+		}
+	}
+
+	animData, err := h.service.GetNDVITimeSeriesAnimation(c.Request.Context(), projectID, z, x, y, start, end)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, animData)
+}
+
 // RegisterMonitoringRoutes registers all monitoring routes.
 func RegisterMonitoringRoutes(r *gin.RouterGroup, handler *MonitoringHandler) {
 	monitoring := r.Group("/monitoring")
@@ -201,5 +277,7 @@ func RegisterMonitoringRoutes(r *gin.RouterGroup, handler *MonitoringHandler) {
 		monitoring.GET("/satellite", handler.ListSatelliteReadings)
 		monitoring.GET("/webhook", handler.ListWebhookReadings)
 		monitoring.GET("/iot", handler.ListIoTReadings)
+		monitoring.GET("/ndvi/tile/:z/:x/:y", handler.GetNDVITile)
+		monitoring.GET("/ndvi/timeseries/animation/:z/:x/:y", handler.GetNDVITimeSeriesAnimation)
 	}
 }

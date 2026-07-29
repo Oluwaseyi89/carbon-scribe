@@ -44,6 +44,31 @@ pub fn emit_document_anchored_event(
     .publish(env);
 }
 
+/// Structured event emitted when project ownership is transferred
+#[contractevent]
+pub struct OwnerTransferred {
+    pub project_id: String,
+    pub old_owner: Address,
+    pub new_owner: Address,
+    pub timestamp: u64,
+}
+
+/// Emit a structured event when project ownership is transferred
+pub fn emit_owner_transferred_event(
+    env: &Env,
+    project_id: String,
+    old_owner: Address,
+    new_owner: Address,
+) {
+    OwnerTransferred {
+        project_id,
+        old_owner,
+        new_owner,
+        timestamp: env.ledger().timestamp(),
+    }
+    .publish(env);
+}
+
 /// Emit a structured event when anchorer index compaction completes
 pub fn emit_anchorer_index_compacted_event(
     env: &Env,

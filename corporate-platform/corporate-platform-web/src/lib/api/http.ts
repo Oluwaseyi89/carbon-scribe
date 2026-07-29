@@ -2,6 +2,7 @@ import { parseApiError, ParsedError } from '@/lib/utils/errorParser'
 import { withRetry, isRetryableError, RetryOptions } from '@/lib/utils/retry'
 import { reportError } from '@/lib/telemetry/errorReporter'
 import { requestManager } from './requestManager'
+import { parseResponseBody } from './responseParser'
 
 export class ApiError extends Error {
   readonly status: number
@@ -115,18 +116,39 @@ export async function apiRequest<T>(
       throw apiError
     }
 
-    const rawBody = await response.text()
-    const parsedBody = rawBody ? safeJsonParse(rawBody) : null
+    const parsedResponse = await parseResponseBody<T>(response)
+
+    // Telemetry tracking for non-JSON responses
+    if (!parsedResponse.isJson && !parsedResponse.isEmpty && !parsedResponse.isBinary) {
+      reportError(
+        `Received non-JSON response (${parsedResponse.contentType || 'unknown'}) for ${method} ${path}`,
+        'http',
+        'warning',
+        {
+          path,
+          method,
+          status: response.status,
+          contentType: parsedResponse.contentType,
+          bodyPreview: parsedResponse.preview,
+          isHtml: parsedResponse.isHtml,
+        },
+      )
+    }
 
     if (!response.ok) {
-      const parsed = parseApiError(parsedBody, response.status)
-      const apiError = new ApiError(response.status, parsed.message, parsedBody)
+      const errorBody = parsedResponse.data ?? parsedResponse.raw
+      const parsed = parseApiError(errorBody, response.status)
+      const apiError = new ApiError(response.status, parsed.message, errorBody)
+      
       reportError(apiError, 'http', response.status >= 500 ? 'error' : 'warning', {
         path,
         method: init.method ?? 'GET',
         status: response.status,
+        contentType: parsedResponse.contentType,
+        bodyPreview: parsedResponse.preview,
       })
-      // Check if this is a retryable error (5xx, 408, 429)
+
+      // Check if retryable: retry on 5xx, 408, 429. Do NOT retry client errors (4xx non-retryable) on invalid content-type.
       const isRetryable = response.status >= 500 || response.status === 408 || response.status === 429
       if (isRetryable) {
         throw apiError // Let retry logic handle it
@@ -135,7 +157,7 @@ export async function apiRequest<T>(
       throw apiError
     }
 
-    return parsedBody as T
+    return parsedResponse.data as T
   }
 
   try {
@@ -158,10 +180,3 @@ export async function apiRequest<T>(
   }
 }
 
-function safeJsonParse(value: string): unknown {
-  try {
-    return JSON.parse(value)
-  } catch {
-    return value
-  }
-}

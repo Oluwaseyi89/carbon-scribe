@@ -1,7 +1,8 @@
 'use client';
 
-import { Calendar, User, GripVertical } from 'lucide-react';
+import { Calendar, User, GripVertical, Loader2 } from 'lucide-react';
 import type { Task } from '@/lib/store/collaboration/collaboration.types';
+import { useStore } from '@/lib/store/store';
 
 const priorityColors: Record<string, string> = {
   low: 'bg-gray-100 text-gray-700',
@@ -17,15 +18,23 @@ interface TaskCardProps {
 
 export default function TaskCard({ task, onClick }: TaskCardProps) {
   const priorityClass = priorityColors[task.priority] ?? priorityColors.medium;
+  const isUpdating = useStore((s) => s.updatingTaskIds?.includes(task.id));
 
   return (
     <button
       type="button"
       onClick={onClick}
-      className="w-full text-left p-4 bg-white border border-gray-200 rounded-xl shadow-sm hover:shadow-md hover:border-emerald-200 transition-all group"
+      disabled={isUpdating}
+      className={`w-full text-left p-4 bg-white border border-gray-200 rounded-xl shadow-sm hover:shadow-md transition-all group ${
+        isUpdating ? 'opacity-70 cursor-not-allowed' : 'hover:border-emerald-200'
+      }`}
     >
       <div className="flex items-start gap-2">
-        <GripVertical className="w-4 h-4 text-gray-300 flex-shrink-0 mt-0.5 opacity-0 group-hover:opacity-100" />
+        {isUpdating ? (
+          <Loader2 className="w-4 h-4 text-emerald-500 animate-spin flex-shrink-0 mt-0.5" />
+        ) : (
+          <GripVertical className="w-4 h-4 text-gray-300 flex-shrink-0 mt-0.5 opacity-0 group-hover:opacity-100" />
+        )}
         <div className="min-w-0 flex-1">
           <h4 className="font-medium text-gray-900 truncate">{task.title}</h4>
           {task.description && (

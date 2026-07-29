@@ -15,4 +15,9 @@ pub enum ContractError {
     RegulatoryNotSet = 10,
     HostJurisdictionNotSet = 11,
     TokenAlreadyBurned = 12,
+    // Mint cap errors (issue #472)
+    SupplyLimitExceeded = 13,
+    MintingIsFrozen = 14,
+    MaxSupplyAlreadySet = 15,
+    MaxSupplyBelowMinted = 16,
 }
