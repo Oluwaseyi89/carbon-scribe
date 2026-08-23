@@ -32,7 +32,6 @@ Current validation snapshot from this branch:
 10. Add dedicated tests for all rejected status transitions (full transition matrix).
 11. Add dedicated tests for compliance hook failure paths (contract missing, malformed response).
 13. Add transfer throttling / circuit-breaker switch for emergency governance response.
-14. Add two-step admin transfer (propose/accept) instead of immediate reassignment.
 15. Add multisig-compatible admin model (role split for mint/config/oracle actions).
 16. Add explicit deprecation path for oracle rotation to avoid single-block trust flips.
 17. Add explicit check that retirement tracker address is contract account at configuration time.
@@ -47,7 +46,6 @@ Current validation snapshot from this branch:
 24. Validate burn call return/error surface from `carbon_asset` and map to `BurnFailed`.
 25. Add explicit cross-contract interface checks during initialization (method existence sanity).
 26. Add duplicate retirement prevention test across `retire` and `batch_retire` interleavings.
-28. Add batch upper bound to prevent resource exhaustion on very large token arrays.
 29. Add event for failed retirement attempts to improve auditability.
 30. Add index compaction/cleanup strategy for very large `EntityIndex` vectors.
 31. Add pagination query for retirements by entity to support large histories.
@@ -76,7 +74,6 @@ Current validation snapshot from this branch:
 52. Add query for all custody records with pagination.
 53. Add query for project-level reserve balances and exposure metrics.
 54. Add reserve policy versioning to track parameter evolution over time.
-55. Add emergency pause for deposits/withdrawals under incident response.
 56. Add role split between reserve manager and governance policy owner.
 57. Add TTL extension policy for custody records and policy state.
 58. Add invariant tests ensuring TVL equals custody record cardinality.
@@ -89,7 +86,6 @@ Current validation snapshot from this branch:
 62. Move critical config keys to instance storage where appropriate for lower rent pressure.
 63. Add metadata schema validation for `name`, `version`, and `registry_link` fields.
 64. Add URI format validation for `registry_link` and CID format validation for `ipfs_cid`.
-65. Add uniqueness constraints for methodology identity (name+version+registry combination).
 66. Add revocation/suspension status field for methodology tokens.
 67. Add explicit historical validity checks rather than current-authority-only evaluation.
 68. Add authority validity windows (start/end timestamps).
@@ -112,7 +108,6 @@ Current validation snapshot from this branch:
 84. Add explicit rule schema validation (non-empty IDs, field length caps, enum consistency).
 
 86. Add deterministic rule priority ordering to avoid first-match ambiguity.
-87. Add rule versioning and immutable history for audit/legal traceability.
 88. Add support for time-bounded rule activation windows.
 
 90. Add event emissions for jurisdiction updates on addresses.
@@ -134,7 +129,6 @@ Current validation snapshot from this branch:
 
 106. Add explicit uniqueness strategy for `tag_id` namespace (global vs token-scoped).
 107. Add immutable revocation status flag instead of removing links only.
-108. Add revocation event emission with actor, reason, and timestamp.
 109. Add attachment event emission for each new tax attribute link.
 110. Add query to retrieve attribute by `tag_id` directly.
 111. Add pagination for token attribute lists.
@@ -154,7 +148,6 @@ Current validation snapshot from this branch:
 
 126. Add canonical event type registry or namespace validation.
 127. Add stronger event ID construction (include nonce/index to avoid collisions).
-128. Add optional hash chaining between events for tamper-evident audit streams.
 
 130. Add pruning/archive policy for large entity/type indexes.
 131. Add pagination for `get_events_by_contract` and `get_events_by_type_and_time`.
@@ -198,7 +191,6 @@ Current validation snapshot from this branch:
 165. Include leaf position semantics in proof verification (currently ordering ignores `_leaf_index`).
 166. Add replay protection keyed by `(epoch_id, registry_credit_id)` with explicit invariants.
 167. Add admin/updater rotation events and historical audit map.
-168. Add root finalization delay or challenge period before minting from new epoch.
 169. Add emergency epoch freeze for compromised relayer scenarios.
 170. Add cross-check that retired credits cannot be reactivated by future roots.
 171. Add retention/TTL strategy for `MerkleRoot`, minted, and retired flags.

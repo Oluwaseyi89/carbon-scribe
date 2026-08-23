@@ -10,8 +10,6 @@ The items below are intended as real production-readiness issues from the curren
    Reconcile the frontend fallback API URL with the backend's documented default port so local environments do not silently point to the wrong service.
 
 
-16. FE-016: Implement security headers in Next.js config
-   Add CSP, HSTS, X-Frame-Options, Referrer-Policy, and related headers to reduce exposure to common browser-side attacks.
 
 
 18. FE-018: Replace default Google font choice with a more controllable production typography stack
@@ -57,11 +55,7 @@ The items below are intended as real production-readiness issues from the curren
 35. FE-035: Add audit trail links from user-visible actions
    Deep-link significant UI events to audit evidence so enterprises can verify what happened without switching context manually.
 
-36. FE-036: Add enterprise session timeout warning modal
-   Warn users before automatic logout so they can refresh tokens intentionally instead of losing in-progress work.
 
-37. FE-037: Implement cross-tab auth state synchronization
-   Ensure logout, refresh, and role changes propagate across open browser tabs to avoid inconsistent access behavior.
 
 38. FE-038: Add route permission mapping tests for all protected pages
    Expand route-guard coverage so every page aligns with backend RBAC expectations and role regressions are caught early.
@@ -106,8 +100,6 @@ The items below are intended as real production-readiness issues from the curren
 52. FE-052: Add document upload size and type prevalidation
    Reject files client-side before transfer when they violate backend or Pinata expectations to reduce failed upload churn.
 
-53. FE-053: Add resumable upload strategy for large IPFS artifacts
-   Support enterprise-scale certificate and evidence uploads so large files do not fail on minor network interruptions.
 
 54. FE-054: Add duplicate-upload detection in the IPFS manager
    Prevent users from uploading the same document repeatedly when retrying uncertain operations.
@@ -148,8 +140,6 @@ The items below are intended as real production-readiness issues from the curren
 66. FE-066: Add skeleton and retry states for the retirement analytics dashboard
    Bring the analytics experience to the same resilience level as the best-tested modules across the app.
 
-67. FE-067: Add real-time retirement feed reconnect strategy
-   Recover live feed subscriptions after tab sleep, network changes, or socket interruptions without requiring a hard refresh.
 
 68. FE-068: Add deduplication for real-time feed events
    Prevent repeated live retirement items when reconnects or backend retries replay the same event more than once.
@@ -180,8 +170,6 @@ The items below are intended as real production-readiness issues from the curren
    Differentiate simulation-only backend responses from fully anchored retirements so compliance users do not over-trust provisional records.
 
 
-79. FE-079: Add duplicate-retirement prevention in the client
-   Lock the form and debounce repeated submits so double-clicks do not create conflicting or duplicate retirement requests.
 
 80. FE-080: Add retirement form validation for business rules beyond field shape
    Validate quantities, ownership context, and timing constraints so users receive meaningful errors before the backend rejects the request.
@@ -216,8 +204,6 @@ The items below are intended as real production-readiness issues from the curren
 90. FE-090: Add credit listing provenance panel on marketplace detail pages
    Surface underlying methodology, issuer, vintage, and verification references so buyers can assess trust without leaving the page.
 
-91. FE-091: Add auction countdown accuracy hardening
-   Ensure timers stay correct under browser throttling, tab suspension, and clock skew so bidding decisions are based on trustworthy timing.
 
 92. FE-092: Add auction reconnection and state resync behavior
    Refresh bid status and winner state after reconnect so stale client state does not mislead active bidders.
@@ -300,8 +286,6 @@ The items below are intended as real production-readiness issues from the curren
 118. FE-118: Add frontend rate-limit handling for auth and bid actions
    Surface retry windows and lockouts cleanly when the backend throttles sensitive operations.
 
-119. FE-119: Add security review for sensitive data persistence in browser storage
-   Reduce exposure from storing access and refresh tokens in `localStorage` without sufficient mitigation or short-lived alternatives.
 
 120. FE-120: Add secure handling for report and certificate downloads
    Prevent token leakage or URL copying issues when opening private documents in new tabs or external viewers.
@@ -412,8 +396,6 @@ The items below are intended as real production-readiness issues from the curren
 16. BE-016: Add observability for IPFS latency, failure, and fallback rates
    Expose metrics and alerts so the team can detect document durability regressions before customers do.
 
-17. BE-017: Remove `dev-jwt-secret` fallback from authentication configuration
-   Require a real JWT secret at startup in all non-test environments so insecure defaults cannot leak into deployed systems.
 
 18. BE-018: Remove `dev-jwt-secret` fallback from tenant token utilities
    Align multi-tenant token verification with the same strict secret requirements used by core auth flows.
@@ -462,8 +444,6 @@ The items below are intended as real production-readiness issues from the curren
 41. BE-041: Replace Kafka disabled-mode throws with a graceful no-op or outbox strategy
    Prevent non-production or degraded environments from crashing async workflows simply because brokers are unavailable.
 
-42. BE-042: Add transactional outbox for event publication
-   Persist domain events in the database before publish so critical workflows remain recoverable when Kafka is offline.
 
 43. BE-043: Add event replay tooling for missed Kafka publications
    Provide a safe way to re-emit failed or skipped events after broker outages or deployment incidents.
@@ -494,8 +474,6 @@ The items below are intended as real production-readiness issues from the curren
 53. BE-053: Add startup validation for Stellar network and contract IDs
    Require correct contract addresses and network passphrase alignment so chain actions cannot target the wrong environment.
 
-54. BE-054: Add secure key management for Stellar signing keys
-   Move away from raw environment secret usage toward a signing abstraction that supports HSM, KMS, or delegated signing.
 
 55. BE-055: Add Soroban transaction polling with finality thresholds
    Track submitted transactions until a trustworthy terminal state is reached instead of relying on one immediate follow-up lookup.
@@ -583,8 +561,6 @@ The items below are intended as real production-readiness issues from the curren
 84. BE-084: Add MFA and step-up auth readiness in the backend auth domain
    Prepare service contracts for stronger authentication flows before enterprise onboarding expands.
 
-85. BE-085: Add secure refresh token rotation and reuse detection
-   Detect replayed refresh tokens and invalidate compromised sessions instead of treating refresh tokens as static secrets.
 
 86. BE-086: Add session and device inventory endpoints
    Let enterprise users inspect and revoke active sessions rather than relying on one global logout behavior.
@@ -619,8 +595,6 @@ The items below are intended as real production-readiness issues from the curren
 96. BE-096: Add contract tests between backend and frontend API expectations
    Verify that the response shapes used by the Next.js client stay aligned with backend controllers as both sides evolve.
 
-97. BE-097: Add webhook signature verification for inbound integrations
-   Protect all externally triggered callbacks from spoofing or replay attacks.
 
 98. BE-098: Add outbound webhook delivery observability and replay tooling
    Track delivery success, retries, and manual replay so customers can trust external notification workflows.
@@ -650,8 +624,6 @@ The items below are intended as real production-readiness issues from the curren
    Verify the credit lineage and availability still hold at retirement time instead of assuming marketplace data stayed unchanged.
 
 
-108. BE-108: Add strong consistency guarantees for availability deductions
-   Use transactions or locking patterns so concurrent purchases and retirements cannot produce negative or duplicated balances.
 
 109. BE-109: Add reconciliation jobs for credit balances and ownership history
    Periodically compare expected balances against transfers, orders, and retirements to detect data drift.
@@ -689,8 +661,6 @@ The items below are intended as real production-readiness issues from the curren
 120. BE-120: Add backfill and recomputation tooling for analytics projections
    Provide a supported path to rebuild summary, forecast, and impact data after bugs or source corrections.
 
-121. BE-121: Complete SBTi dashboard aggregation logic
-   Replace the existing TODO-marked placeholder approach with production-grade target progress and chart aggregation.
 
 122. BE-122: Add framework-registry synchronization monitoring
    Alert when methodology and framework mappings drift or fail to update so reporting remains defensible.
@@ -740,8 +710,6 @@ The items below are intended as real production-readiness issues from the curren
 137. BE-137: Add dependency vulnerability review for blockchain and network libraries
    Audit the current package set, including dual Stellar SDK usage, before relying on the service in production.
 
-138. BE-138: Remove or justify duplicate Stellar SDK dependencies
-   Reconcile use of both `@stellar/stellar-sdk` and `stellar-sdk` so version drift does not create inconsistent chain behavior.
 
 139. BE-139: Add package update policy for Nest, Prisma, and infrastructure libraries
    Establish a disciplined approach to keeping critical dependencies patched without destabilizing the service.

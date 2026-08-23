@@ -10,7 +10,6 @@
 
 
 
-10. **Wire alert notification dispatch** — `internal/monitoring/alerts/notifications.go` is future-gated and alerts never trigger any downstream delivery even if the engine were live.
 
 
 
@@ -74,13 +73,11 @@
 
 
 
-41. **Implement SES email delivery client** — `pkg/aws/ses_client.go` is future-gated and no transactional email can be sent via AWS Simple Email Service.
 
 42. **Implement SNS push notification client** — `pkg/aws/sns_client.go` is future-gated, blocking mobile push and cross-service fan-out notifications.
 
 43. **Implement EventBridge event bus client** — `pkg/events/event_bridge.go` is future-gated so platform events cannot be published to the AWS event bus for downstream services.
 
-44. **Implement MQTT IoT telemetry client** — `pkg/iot/mqtt_client.go` is future-gated and no soil sensor or methane detector data can flow in via MQTT broker.
 
 45. **Implement WebSocket protocol codec package** — `pkg/websocket/protocol.go` is future-gated and WS message framing/encoding is undefined.
 
@@ -113,7 +110,6 @@
 
 56. **Add transaction fee bump logic for Soroban operations** — No fee bump account or max fee strategy is defined, risking transaction failures under network congestion.
 
-57. **Implement Stellar asset trustline setup for new buyers** — No endpoint creates a trustline on a buyer's Stellar account before attempting a carbon credit transfer, which will always fail.
 
 ---
 
@@ -127,7 +123,6 @@
 
 61. **Add HMAC-SHA256 signature validation for incoming webhooks** — No signature header is verified on inbound webhook payloads, allowing any external party to forge platform events.
 
-62. **Add PKCE and state parameter validation to OAuth callback** — The OAuth callback endpoint accepts `code` without verifying the `state` anti-CSRF parameter, enabling authorization code injection.
 
 ---
 
@@ -168,7 +163,6 @@
 
 ### 🟠 Authentication
 
-76. **Implement account lockout after repeated failed login attempts** — No brute-force protection exists; an attacker can attempt unlimited credential guesses without throttling.
 
 77. **Implement password reset request and confirm flow** — No password reset token creation or confirmation endpoint exists in the auth module.
 
@@ -214,7 +208,6 @@
 
 95. **Wire Stripe payment intent creation to financing endpoints** — The `pkg/billing/stripe_client.go` file exists but no charge or payment-intent flow is called from any financing handler.
 
-96. **Implement Stellar payout for revenue distribution** — Revenue distribution records are created with beneficiary splits but no Stellar payment operation is ever submitted to execute the payout.
 
 97. **Replace hardcoded price quotes with pricing oracle** — Forward sale price quotes return static values rather than fetching live carbon credit pricing from an external data source.
 
@@ -283,7 +276,6 @@
 
 123. **Standardize error wrapping with `%w` across all packages** — Dozens of `fmt.Errorf` calls across service layers omit `%w`, breaking `errors.Is` and `errors.As` unwrapping for callers.
 
-124. **Replace hardcoded magic numbers with named constants** — Hardcoded values like `45` ms dummy latency, platform fee percentages, and retry counts are scattered without explanation or named constants.
 
 125. **Propagate request context to all GORM database calls** — Several repository methods call GORM without passing `ctx`, preventing request cancellation from reaching the database driver.
 
@@ -385,7 +377,6 @@
 
 14. **Create Stellar transaction history page** — There is no page for viewing on-chain retirement and transfer history despite the backend `/api/v1/stellar` endpoints being available.
 
-15. **Create user profile page at `/profile`** — No `/profile` route exists; users can only update profile data through the Settings page tab and cannot view a standalone profile.
 
 16. **Create credit portfolio page for project owners** — No dedicated page displays a project owner's minted token portfolio, on-chain balances, or retirement certificates.
 
@@ -397,7 +388,6 @@
 
 18. **Display minting transaction hash as a Stellar Expert link** — The minting API response includes `mint_transaction_hash` but the TokenizationWizard does not show it as a clickable Stellar Explorer URL.
 
-19. **Implement Stellar wallet connect button for SEP-10 login** — The backend supports SEP-10 challenge-response authentication but there is no wallet connect button or flow in the login page UI.
 
 20. **Add Stellar address format validation to wallet fields** — Any text is accepted in wallet address inputs without validating that it is a valid Stellar public key (`G...` format, 56 characters).
 
@@ -405,7 +395,6 @@
 
 ### 🟠 State Management Gaps
 
-24. **Compose integrations slice into the main store** — The integrations slice lives in `store/` root but is not included in the main `lib/store/store.ts` composed store, creating a separate store instance.
 
 
 
@@ -480,7 +469,6 @@
 
 62. **Compute `SLATracker` percentages from live uptime API** — SLA compliance percentages are hardcoded instead of being calculated from the `uptimeStats` object in the health store.
 
-63. **Fetch maintenance schedules for `MaintenanceCalendar`** — The calendar renders empty with no call to a maintenance schedule endpoint, making scheduled downtime invisible to users.
 
 64. **Bind `UptimeChart` to historical uptime API data** — The chart is rendered with dummy static data points rather than data from `fetchUptimeApi`.
 
@@ -534,7 +522,6 @@
 ### 🟠 Map / Geospatial Components
 
 
-84. **Add GeoJSON polygon drawing tool to `CarbonMap`** — No draw control exists for users to define project land boundaries on the map interactively.
 
 85. **Implement satellite vs. base map layer toggle in `CarbonMap`** — No layer switcher control allows toggling between the satellite raster layer and a standard base map.
 
@@ -564,7 +551,6 @@
 
 ### 🟠 Collaboration Components
 
-95. **Subscribe to WebSocket for real-time comment updates** — New comments posted by other users are only visible after a manual page refresh; no WebSocket listener exists.
 
 96. **Add edit and delete actions to existing comment items** — Comments can be created but no edit pencil or delete trash icon exists on an already-posted comment.
 
@@ -584,7 +570,6 @@
 
 ### 🟡 Accessibility
 
-103. **Add `aria-label` to all icon-only buttons** — Across the UI, dozens of icon buttons (edit, delete, close, expand) have no `aria-label`, making them inaccessible to screen readers.
 
 104. **Implement full keyboard navigation for the portal sidebar** — The sidebar cannot be fully navigated using only a keyboard; focus management between nav items is broken.
 
@@ -626,7 +611,6 @@
 
 119. **Add CSRF double-submit cookie or `SameSite=Strict` enforcement** — Mutating requests from the frontend do not include a CSRF token; relying on SameSite alone is insufficient for cross-origin form submissions.
 
-120. **Redact sensitive fields from Zustand `persist` storage** — The Zustand persist configuration writes `token`, `refreshToken`, and `user` to `localStorage` without encrypting them.
 
 ---
 
