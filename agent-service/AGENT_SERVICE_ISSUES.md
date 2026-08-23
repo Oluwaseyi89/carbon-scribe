@@ -2,11 +2,12 @@
 
 150 issue titles for turning the `agent-service` scaffold into a working service, grouped by area. Each title has a one-sentence description. Numbers are stable IDs for cross-referencing, not a required creation order — see the scaffold's `TODO` comments for where each maps to code.
 
+Entries already filed as GitHub issues (labeled `agent-service`) are removed from this list to avoid duplicate creation — their number is left retired rather than reused. See issues [#573](https://github.com/CarbonScribe/carbon-scribe/issues/573)–[#582](https://github.com/CarbonScribe/carbon-scribe/issues/582) for #3, #23, #31, #38, #51, #63, #75, #87, #99, #114.
+
 ## Foundation & Infra (1–14)
 
 1. **Add Dockerfile for agent-service** — Package the service into a production container image following the health-check pattern used in corporate-platform-backend.
 2. **Add docker-compose entry for local development** — Let contributors run agent-service alongside corporate-platform and project-portal with one command.
-3. **Implement `/health/liveness` and `/health/readiness` endpoints** — Replace the single `/health` stub with the two-probe pattern already used in corporate-platform-backend.
 4. **Add readiness check for Anthropic API reachability** — Verify the Anthropic client can reach the API before reporting the service ready.
 5. **Add readiness check for corporate-platform-backend reachability** — Confirm the upstream service is reachable before marking agent-service ready to serve traffic.
 6. **Add readiness check for project-portal-backend reachability** — Confirm the upstream Go service is reachable before marking agent-service ready to serve traffic.
@@ -32,7 +33,6 @@
 
 ## Audit Log (23–29)
 
-23. **Persist audit log entries to a database** — Replace the stdout `console.log` in `audit-log.service.ts` with a real persistent store.
 24. **Record full tool-call inputs/outputs in the audit log** — Extend `AgentAuditEntry` to capture tool arguments and results, not just tool names.
 25. **Link agent-service audit entries to corporate-platform's audit-trail module** — Decide whether agent decisions should be pushed into the existing `audit-trail` service so compliance history lives in one place.
 26. **Add an audit log query endpoint** — Expose a read API so support/compliance staff can look up what an agent did for a given `requestId`.
@@ -43,7 +43,6 @@
 ## Guardrails & Approval (30–37)
 
 30. **Design the human-approval workflow for `needs-approval` results** — Define what UI/API a reviewer uses to approve or reject a drafted agent action.
-31. **Implement `checkApproval` logic per action type** — Replace the always-`needs-approval` stub in `approval-gate.ts` with real per-action rules.
 32. **Add an approval-decision audit trail** — Record who approved or rejected an agent-drafted action, and when.
 33. **Add an "auto-approved" path for low-risk read-only actions** — Allow actions with no side effects (e.g. a discovery search) to skip the approval gate while mutating actions never do.
 34. **Add rate limiting on approval requests** — Prevent a single agent from flooding the approval queue with runs.
@@ -53,7 +52,6 @@
 
 ## Auth & Middleware (38–45)
 
-38. **Replace shared-secret auth with the platform's real service-to-service auth** — Align `auth.middleware.ts` with whatever JWT/guard pattern corporate-platform-backend already uses.
 39. **Add per-caller rate limiting** — Reuse or mirror corporate-platform-backend's `rate-limit` module to cap requests per calling service/user.
 40. **Add request body size limits** — Protect the service from oversized payloads in `express.json()`.
 41. **Add CORS configuration** — Decide which origins are allowed to call agent-service directly, if any.
@@ -72,7 +70,6 @@
 
 ## Corporate-Platform Client (51–62)
 
-51. **Implement `getPortfolio(companyId)`** — Fetch a company's current credit portfolio for the discovery and compliance-report agents.
 52. **Implement `listMarketplaceCredits(filters)`** — Back the discovery agent's `search_marketplace_credits` tool with a real marketplace query.
 53. **Implement `getComplianceFramework(framework)`** — Fetch framework-specific reporting requirements from the `csrd`/`cbam`/`corsia`/`sbti`/`ghg-protocol` modules.
 54. **Implement `getRetirementHistory(companyId)`** — Back the compliance-report agent's evidence-gathering tool.
@@ -87,7 +84,6 @@
 
 ## Project-Portal Client (63–74)
 
-63. **Implement `getMethodologies()`** — Back the PDD-draft agent's methodology-matching tool.
 64. **Implement `getProject(projectId)`** — Fetch project details for both the PDD-draft and alert-triage agents.
 65. **Implement `getMonitoringAlerts(projectId, since)`** — Back the alert-triage agent's correlation tool.
 66. **Implement `getSatelliteTimeseries(projectId, metric)`** — Fetch NDVI/biomass time series for alert-triage correlation.
@@ -102,7 +98,6 @@
 
 ## Discovery Agent (75–86)
 
-75. **Wire `runDiscoveryAgent` to the Anthropic tool runner** — Replace the `throw new Error("not implemented")` stub with a real `client.beta.messages.toolRunner` call.
 76. **Finish `search_marketplace_credits` tool implementation** — Call the real `listMarketplaceCredits` client method once issue #52 lands.
 77. **Add a `get_company_preferences` tool** — Let the discovery agent fetch a buyer's saved compliance framework and co-benefit priorities instead of requiring them in every request.
 78. **Add citation enforcement to discovery agent output** — Reject or flag any recommendation that doesn't reference a specific marketplace credit ID.
@@ -117,7 +112,6 @@
 
 ## PDD-Draft Agent (87–98)
 
-87. **Wire `runPddDraftAgent` to the Anthropic tool runner** — Replace the `throw new Error("not implemented")` stub with a real tool-runner call.
 88. **Finish `match_methodology` tool implementation** — Call the real `getMethodologies` client method once issue #63 lands.
 89. **Add a `get_documentation_requirements` tool** — Fetch the specific document checklist for a matched methodology.
 90. **Add missing-documentation flagging to PDD output** — Ensure the agent explicitly lists what's missing rather than drafting around gaps.
@@ -132,7 +126,6 @@
 
 ## Compliance-Report Agent (99–113)
 
-99. **Wire `runComplianceReportAgent` to the Anthropic tool runner** — Replace the `throw new Error("not implemented")` stub with a real tool-runner call.
 100. **Finish `get_company_retirement_evidence` tool implementation** — Call the real evidence-gathering client methods once issues #54–55 land.
 101. **Implement CSRD-specific report drafting logic** — Map gathered evidence into the CSRD report structure.
 102. **Implement CBAM-specific report drafting logic** — Map gathered evidence into the CBAM report structure.
@@ -150,7 +143,6 @@
 
 ## Alert-Triage Agent (114–125)
 
-114. **Wire `runAlertTriageAgent` to the Anthropic tool runner** — Replace the `throw new Error("not implemented")` stub with a real tool-runner call.
 115. **Finish `get_monitoring_signals` tool implementation** — Call the real satellite/IoT/weather client methods once issues #64–68 land.
 116. **Add an escalation-decision output field** — Have the agent return a clear escalate/suppress/needs-more-data verdict, not just prose.
 117. **Wire escalation to project-portal's notification pipeline** — Once approved, actually push a confirmed alert into `internal/notifications`.
