@@ -26,7 +26,6 @@ Current validation snapshot from this branch:
 4. Enforce methodology validation on mint via cross-contract call to `methodology_library`.
 5. Add optional requirement that `methodology_id` must exist before mint completion.
 6. Add mint-time host jurisdiction normalization and canonical code validation.
-7. Add safe increment check for `NextTokenId` overflow handling.
 
 9. Add invariant test ensuring burned tokens can never reappear in owner token lists.
 10. Add dedicated tests for all rejected status transitions (full transition matrix).
@@ -48,7 +47,6 @@ Current validation snapshot from this branch:
 26. Add duplicate retirement prevention test across `retire` and `batch_retire` interleavings.
 29. Add event for failed retirement attempts to improve auditability.
 30. Add index compaction/cleanup strategy for very large `EntityIndex` vectors.
-31. Add pagination query for retirements by entity to support large histories.
 32. Add method to fetch retirement record count for deterministic pagination.
 33. Add immutable admin rotation delay/timelock on `update_carbon_asset_contract`.
 34. Add freeze switch that blocks contract address updates after governance finalization.
@@ -65,8 +63,6 @@ Current validation snapshot from this branch:
 43. Enforce non-zero governance and carbon contract addresses at initialization.
 44. Add validation that deposited token actually exists and is custodied by pool contract.
 45. Add cross-contract transfer-in call to ensure custody is real, not metadata-only.
-
-47. Add TVL underflow/overflow protections using checked arithmetic.
 
 49. Add replacement eligibility checks for `target_invalidated_token` before withdrawal.
 50. Add explicit mapping between replacement token and invalidated token for traceability.
@@ -93,7 +89,6 @@ Current validation snapshot from this branch:
 70. Add event for admin initialization and authority list bootstrap.
 71. Add event for metadata updates and revocations.
 72. Add bounded authority list size and pagination methods.
-73. Replace `unwrap()` on authority vector access with typed error handling.
 74. Add full approval/transfer edge-case tests for token ownership semantics.
 75. Add tests for unauthorized initialize and duplicate initialize paths.
 76. Add tests for revoked authority behavior on historical token validity.
@@ -107,7 +102,6 @@ Current validation snapshot from this branch:
 83. Add validation that carbon asset contract address is non-zero and contract account.
 84. Add explicit rule schema validation (non-empty IDs, field length caps, enum consistency).
 
-86. Add deterministic rule priority ordering to avoid first-match ambiguity.
 88. Add support for time-bounded rule activation windows.
 
 90. Add event emissions for jurisdiction updates on addresses.
@@ -125,7 +119,6 @@ Current validation snapshot from this branch:
 
 102. Add one-time initialization guard with typed error return.
 103. Require admin auth in initialization flow for explicit ownership acceptance.
-104. Add validation that `valid_from <= valid_until` for attribute definitions.
 
 106. Add explicit uniqueness strategy for `tag_id` namespace (global vs token-scoped).
 107. Add immutable revocation status flag instead of removing links only.
@@ -147,7 +140,6 @@ Current validation snapshot from this branch:
 124. Add one-time initialization guard returning error instead of panic.
 
 126. Add canonical event type registry or namespace validation.
-127. Add stronger event ID construction (include nonce/index to avoid collisions).
 
 130. Add pruning/archive policy for large entity/type indexes.
 131. Add pagination for `get_events_by_contract` and `get_events_by_type_and_time`.
@@ -175,7 +167,6 @@ Current validation snapshot from this branch:
 
 152. Add TTL extension policy for project owner and history state.
 153. Add batch size upper bound to prevent resource exhaustion.
-154. Add stronger CID validation including codec/multihash consistency checks.
 155. Add tests for unauthorized registration/transfer paths.
 156. Add tests for large history retrieval and pagination stability.
 157. Add tests for duplicate project IDs across case variants.
@@ -188,7 +179,6 @@ Current validation snapshot from this branch:
 162. Require carbon asset contract to be configured before `mint_wrapped` execution.
 
 164. Define and enforce canonical Merkle tree serialization spec shared with relayer.
-165. Include leaf position semantics in proof verification (currently ordering ignores `_leaf_index`).
 166. Add replay protection keyed by `(epoch_id, registry_credit_id)` with explicit invariants.
 167. Add admin/updater rotation events and historical audit map.
 169. Add emergency epoch freeze for compromised relayer scenarios.
@@ -217,7 +207,6 @@ Current validation snapshot from this branch:
 190. Add event for admin/config updates (`set_admin`, `set_validate_vintage`).
 191. Add two-step admin transfer with acceptance flow.
 192. Add governance timelock before disabling vintage validation.
-193. Replace year-seconds approximation with precise date arithmetic for vintage windows.
 194. Add fallback behavior when vintage oracle call fails (explicit policy).
 195. Add validation for `vintage` contract interface compatibility during configuration.
 196. Add pause switch for lock/release operations during incident response.

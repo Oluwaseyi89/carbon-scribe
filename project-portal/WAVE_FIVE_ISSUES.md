@@ -17,8 +17,6 @@
 
 13. **Implement analytics trends service** — `internal/monitoring/analytics/trends.go` is future-gated so historical trend reports cannot be generated from monitoring data.
 
-14. **Implement analytics performance service** — `internal/monitoring/analytics/performance.go` is future-tagged and performance benchmarks against SLA thresholds are unavailable.
-
 ---
 
 ### 🔴 Notifications Module (All Behind `//go:build future`)
@@ -31,8 +29,6 @@
 20. **Implement notification rules scheduler** — `internal/notifications/rules/scheduler.go` is future-gated, meaning time-based notification schedules (daily digests, weekly reports) cannot fire.
 
 21. **Build notification template manager** — `internal/notifications/templates/manager.go` is future-tagged and there is no way to create or update notification templates at runtime.
-
-22. **Build notification template renderer** — `internal/notifications/templates/renderer.go` is future-gated so template variable interpolation never executes.
 
 23. **Build notification template store** — `internal/notifications/templates/store.go` is future-gated and templates cannot be persisted or read from any storage backend.
 
@@ -93,8 +89,6 @@
 49. **Replace placeholder GeoHash in minting metadata** — The carbon asset GeoHash is a zero-value byte array rather than a hash of the project's actual registered boundary polygon.
 
 50. **Move minting to an async background job** — The Soroban transaction submission blocks the HTTP handler for the full network round-trip duration, creating timeout risk under load.
-
-51. **Add exponential backoff to Soroban RPC retry loop** — The minting retry loop retries immediately on every failure, hammering the RPC endpoint and exhausting rate limits.
 
 ---
 
@@ -194,8 +188,6 @@
 
 89. **Add composite index on compliance records for soft-delete filtering** — Soft-deleted compliance records are included in query results unless manually filtered, and there is no index supporting the `deleted_at IS NULL` predicate efficiently.
 
-90. **Add TTL-indexed expiry column on inventory cache table** — The credit inventory cache has no indexed expiry column, so expired rows are never efficiently identified for invalidation.
-
 ---
 
 ### 🟡 Geospatial
@@ -241,8 +233,6 @@
 109. **Add a `/metrics` Prometheus endpoint** — No metrics scrape endpoint exists for infrastructure monitoring tools to collect request rates or latencies.
 
 110. **Add `HEALTHCHECK` instruction to Dockerfile** — The Dockerfile contains no `HEALTHCHECK` directive, so Docker and Kubernetes cannot detect an unhealthy container.
-
-111. **Validate all required secrets on application startup** — The service starts successfully even with empty JWT secret, Stripe key, or DB password environment variables, deferring failures to runtime.
 
 112. **Tune GORM database connection pool for production** — GORM's default pool (`MaxOpenConns=0`, unlimited) provides no backpressure and can exhaust database connections under load.
 
@@ -386,8 +376,6 @@
 
 17. **Wire `carbonTokens.ts` to TokenizationWizard complete step** — After minting, the wizard does not call any frontend Stellar function to confirm the transaction on-chain before marking the step complete.
 
-18. **Display minting transaction hash as a Stellar Expert link** — The minting API response includes `mint_transaction_hash` but the TokenizationWizard does not show it as a clickable Stellar Explorer URL.
-
 
 20. **Add Stellar address format validation to wallet fields** — Any text is accepted in wallet address inputs without validating that it is a valid Stellar public key (`G...` format, 56 characters).
 
@@ -431,8 +419,6 @@
 
 43. **Show session expiry countdown before token expiration** — No UI warning is shown to the user before their session expires; the next API call simply fails silently.
 
-44. **Add CAPTCHA to registration and login forms** — No bot protection (reCAPTCHA, hCaptcha, or Cloudflare Turnstile) is applied to public authentication endpoints.
-
 45. **Prevent back-navigation to login after authenticated redirect** — Authenticated users can press the browser back button to reach the login page, causing a confusing double-login state.
 
 ---
@@ -457,8 +443,6 @@
 55. **Wire `CheckResultsTimeline` to health check results endpoint** — No `fetchChecksHistory` API call exists; the timeline renders perpetually empty.
 
 56. **Bind `MetricsTimeSeries` chart to health store metrics data** — The chart component renders an empty container without binding the `metrics` array from the health slice to the Recharts series.
-
-57. **Fix `MetricSelector` to re-render chart on selection change** — Selecting a metric updates component-local state but the parent chart does not observe the change and re-render.
 
 
 59. **Wire `DependencyGraph` to live dependency data** — The graph renders static example nodes instead of the `dependencies` array returned by `fetchDependenciesApi`.
@@ -601,8 +585,6 @@
 
 ### 🟡 Security
 
-115. **Add Content Security Policy to `next.config.ts` headers** — No CSP header is configured in the Next.js headers config, leaving the app vulnerable to cross-site scripting injection.
-
 116. **Sanitize user-generated comment content before rendering** — Comment text from the API is rendered directly into the DOM without DOMPurify sanitization, enabling stored XSS.
 
 117. **Validate post-login redirect URLs to prevent open redirect** — The redirect URL parameter accepted after login is not validated against an allowlist, enabling phishing via crafted redirect URLs.
@@ -629,8 +611,6 @@
 126. **Add Playwright E2E test for the full tokenization wizard** — No E2E test covers the credit calculation → review → mint → complete flow.
 
 127. **Add Playwright E2E test for protected route auth redirect** — No E2E test verifies that unauthenticated access to a protected route redirects to login.
-
-128. **Fix test setup global Axios mock leaking between suites** — `test/setup.ts` installs a global Axios/fetch mock that affects unrelated test suites, causing false positives and false failures.
 
 ---
 

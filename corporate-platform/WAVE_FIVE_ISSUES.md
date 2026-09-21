@@ -18,9 +18,6 @@ The items below are intended as real production-readiness issues from the curren
 19. FE-019: Add Open Graph and social metadata per route
    Provide route-specific metadata so shared portfolio, retirement, and reporting pages produce useful previews and preserve brand quality.
 
-20. FE-020: Add favicon, manifest, and PWA metadata completeness pass
-   Complete browser metadata and installability details so enterprise users get a polished experience on managed devices.
-
 
 25. FE-025: Add aria-live feedback for long-running actions
    Provide assistive announcements for uploads, retirement requests, report generation, and auction bids so status changes are not silent.
@@ -101,9 +98,6 @@ The items below are intended as real production-readiness issues from the curren
    Reject files client-side before transfer when they violate backend or Pinata expectations to reduce failed upload churn.
 
 
-54. FE-054: Add duplicate-upload detection in the IPFS manager
-   Prevent users from uploading the same document repeatedly when retrying uncertain operations.
-
 55. FE-055: Add integrity verification status surfacing for IPFS documents
    Show whether a document is pinned, replicated, or using fallback storage so users can trust retained evidence.
 
@@ -144,9 +138,6 @@ The items below are intended as real production-readiness issues from the curren
 68. FE-068: Add deduplication for real-time feed events
    Prevent repeated live retirement items when reconnects or backend retries replay the same event more than once.
 
-
-70. FE-070: Add explorer-link validation in Stellar transfer views
-   Ensure on-chain links are correct for the configured network so users do not open the wrong testnet or mainnet explorer pages.
 
 71. FE-071: Add fallback handling for delayed transfer-status endpoints
    Avoid indefinite spinners when purchase status polling returns stale or incomplete transfer records.
@@ -194,9 +185,6 @@ The items below are intended as real production-readiness issues from the curren
 
 87. FE-087: Add partial-failure handling for recurring retirement batches
    Surface when one line item in a scheduled batch fails so users do not assume the entire program completed successfully.
-
-88. FE-088: Add marketplace filter persistence across navigation
-   Preserve methodology, geography, quality, and price filters when users open a credit detail and return to browse results.
 
 89. FE-089: Add marketplace deep-linking for saved searches
    Let users share or bookmark complex discovery filters for repeated procurement workflows.
@@ -273,9 +261,6 @@ The items below are intended as real production-readiness issues from the curren
 
 114. FE-114: Add MFA readiness placeholders and architecture in auth UI
    Prepare the frontend auth flows for future step-up authentication instead of hard-coding single-factor assumptions everywhere.
-
-115. FE-115: Add forgot-password and reset-password route completeness check
-   Ensure all public auth routes referenced by the guard actually exist and are discoverable in the application flow.
 
 116. FE-116: Add public-route shell consistency for auth pages
    Make login, register, forgot-password, and reset-password pages share one polished unauthenticated layout rather than mixed shell behavior.
@@ -397,9 +382,6 @@ The items below are intended as real production-readiness issues from the curren
    Expose metrics and alerts so the team can detect document durability regressions before customers do.
 
 
-18. BE-018: Remove `dev-jwt-secret` fallback from tenant token utilities
-   Align multi-tenant token verification with the same strict secret requirements used by core auth flows.
-
 20. BE-020: Add explicit placeholder-secret detection across config
    Reject values like demo passwords, mock keys, and local bypass tokens during deployment validation.
 
@@ -411,9 +393,6 @@ The items below are intended as real production-readiness issues from the curren
 
 23. BE-023: Add production-safe config documentation and examples
    Update operational docs so contributors and deployers do not copy development-only settings into shared environments.
-
-24. BE-024: Add startup validation for CORS origin lists
-   Reject malformed or overly broad origin values before they create insecure or unpredictable browser access behavior.
 
 25. BE-025: Add request body size limits at the Nest application layer
    Protect the service from oversized payloads and accidental memory exhaustion during uploads and bulk operations.
@@ -470,9 +449,6 @@ The items below are intended as real production-readiness issues from the curren
 
 52. BE-052: Add explicit distinction between simulated and on-chain contract calls in domain workflows
    Prevent business logic from treating simulated contract execution as equivalent to immutable blockchain confirmation.
-
-53. BE-053: Add startup validation for Stellar network and contract IDs
-   Require correct contract addresses and network passphrase alignment so chain actions cannot target the wrong environment.
 
 
 55. BE-055: Add Soroban transaction polling with finality thresholds
@@ -583,9 +559,6 @@ The items below are intended as real production-readiness issues from the curren
 92. BE-092: Add request validation consistency audit across controllers
    Ensure all DTOs, query params, and payloads are validated uniformly rather than relying on ad hoc service checks.
 
-93. BE-093: Add pagination, filtering, and bounds validation for list endpoints
-   Protect the service from unbounded queries and abusive parameters on document, portfolio, audit, and marketplace APIs.
-
 94. BE-094: Add API versioning and deprecation policy
    Formalize how route changes are introduced so frontend and partner integrations do not break unexpectedly.
 
@@ -651,9 +624,6 @@ The items below are intended as real production-readiness issues from the curren
 
 117. BE-117: Add cache key namespacing by tenant and permission scope
    Prevent accidental cross-tenant leakage through shared cache entries.
-
-118. BE-118: Add fallback behavior when Redis is unavailable
-   Keep the service functional in a controlled way when caching and session infrastructure are temporarily degraded.
 
 119. BE-119: Add analytics data freshness metadata to responses
    Return calculation timestamps and source windows so the frontend can tell users when numbers may be delayed or partial.

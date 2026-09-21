@@ -2,7 +2,7 @@
 
 150 issue titles for turning the `agent-service` scaffold into a working service, grouped by area. Each title has a one-sentence description. Numbers are stable IDs for cross-referencing, not a required creation order — see the scaffold's `TODO` comments for where each maps to code.
 
-Entries already filed as GitHub issues (labeled `agent-service`) are removed from this list to avoid duplicate creation — their number is left retired rather than reused. See issues [#573](https://github.com/CarbonScribe/carbon-scribe/issues/573)–[#582](https://github.com/CarbonScribe/carbon-scribe/issues/582) for #3, #23, #31, #38, #51, #63, #75, #87, #99, #114.
+Entries already filed as GitHub issues (labeled `agent-service`) are removed from this list to avoid duplicate creation — their number is left retired rather than reused. See issues [#573](https://github.com/CarbonScribe/carbon-scribe/issues/573)–[#582](https://github.com/CarbonScribe/carbon-scribe/issues/582) for #3, #23, #31, #38, #51, #63, #75, #87, #99, #114. See issues [#625](https://github.com/CarbonScribe/carbon-scribe/issues/625), [#627](https://github.com/CarbonScribe/carbon-scribe/issues/627), [#629](https://github.com/CarbonScribe/carbon-scribe/issues/629)–[#633](https://github.com/CarbonScribe/carbon-scribe/issues/633), [#635](https://github.com/CarbonScribe/carbon-scribe/issues/635)–[#637](https://github.com/CarbonScribe/carbon-scribe/issues/637) for #7, #19, #24, #30, #42, #48, #56, #72, #117, #131.
 
 ## Foundation & Infra (1–14)
 
@@ -11,7 +11,6 @@ Entries already filed as GitHub issues (labeled `agent-service`) are removed fro
 4. **Add readiness check for Anthropic API reachability** — Verify the Anthropic client can reach the API before reporting the service ready.
 5. **Add readiness check for corporate-platform-backend reachability** — Confirm the upstream service is reachable before marking agent-service ready to serve traffic.
 6. **Add readiness check for project-portal-backend reachability** — Confirm the upstream Go service is reachable before marking agent-service ready to serve traffic.
-7. **Add structured JSON logging** — Replace ad-hoc `console.log`/`console.error` calls with a structured logger (e.g. pino) for production log aggregation.
 8. **Add request ID propagation middleware** — Generate or forward a request ID on every inbound call and attach it to all downstream logs and audit entries.
 9. **Add graceful shutdown handling** — Close the HTTP server and flush pending audit-log writes on SIGTERM/SIGINT.
 10. **Add environment variable validation on startup** — Fail fast with a clear error if required env vars are missing or malformed, instead of surfacing failures at request time.
@@ -26,14 +25,12 @@ Entries already filed as GitHub issues (labeled `agent-service`) are removed fro
 16. **Add per-agent cost logging** — Record `usage.input_tokens`/`output_tokens` per run so LLM spend is attributable to a specific agent and requester.
 17. **Add a token-budget guard per agent run** — Cap max tool-call iterations/tokens per request to prevent a runaway agentic loop from generating unbounded cost.
 18. **Add prompt-caching to shared system prompts** — Apply `cache_control` to each agent's system prompt since it's static across requests.
-19. **Handle Anthropic typed errors distinctly** — Catch `RateLimitError`, `APIConnectionError`, and `APIStatusError` separately in each agent and map them to distinct HTTP responses.
 20. **Add a circuit breaker for the Anthropic client** — Stop issuing new LLM calls temporarily after repeated failures, instead of retrying into a known outage.
 21. **Add streaming support for long-running agent runs** — Let long compliance-report drafts stream partial output back to the caller instead of blocking until completion.
 22. **Pin and document the Claude model version per agent** — Decide whether all four agents share `AGENT_MODEL` or need per-agent model overrides, and document the choice.
 
 ## Audit Log (23–29)
 
-24. **Record full tool-call inputs/outputs in the audit log** — Extend `AgentAuditEntry` to capture tool arguments and results, not just tool names.
 25. **Link agent-service audit entries to corporate-platform's audit-trail module** — Decide whether agent decisions should be pushed into the existing `audit-trail` service so compliance history lives in one place.
 26. **Add an audit log query endpoint** — Expose a read API so support/compliance staff can look up what an agent did for a given `requestId`.
 27. **Add an audit log retention policy** — Define and implement how long agent audit entries are kept, matching whatever policy `project-portal-backend/internal/compliance/retention` already uses.
@@ -42,7 +39,6 @@ Entries already filed as GitHub issues (labeled `agent-service`) are removed fro
 
 ## Guardrails & Approval (30–37)
 
-30. **Design the human-approval workflow for `needs-approval` results** — Define what UI/API a reviewer uses to approve or reject a drafted agent action.
 32. **Add an approval-decision audit trail** — Record who approved or rejected an agent-drafted action, and when.
 33. **Add an "auto-approved" path for low-risk read-only actions** — Allow actions with no side effects (e.g. a discovery search) to skip the approval gate while mutating actions never do.
 34. **Add rate limiting on approval requests** — Prevent a single agent from flooding the approval queue with runs.
@@ -55,7 +51,6 @@ Entries already filed as GitHub issues (labeled `agent-service`) are removed fro
 39. **Add per-caller rate limiting** — Reuse or mirror corporate-platform-backend's `rate-limit` module to cap requests per calling service/user.
 40. **Add request body size limits** — Protect the service from oversized payloads in `express.json()`.
 41. **Add CORS configuration** — Decide which origins are allowed to call agent-service directly, if any.
-42. **Add Helmet security headers** — Match corporate-platform-backend's use of `helmet` for baseline HTTP hardening.
 43. **Add request validation middleware using the existing Zod schemas** — Validate `AgentRunRequest` bodies at the route boundary instead of trusting the cast in each controller.
 44. **Add an API-key mechanism for external callers** — Decide if any caller outside corporate-platform/project-portal needs access, and if so how it's authenticated.
 45. **Write tests for the auth middleware** — Cover missing token, wrong token, and valid token cases for `requireInternalAuth`.
@@ -64,7 +59,6 @@ Entries already filed as GitHub issues (labeled `agent-service`) are removed fro
 
 46. **Publish `AgentRunRequest`/`AgentRunResult` as a shared npm package** — Let corporate-platform-backend (TypeScript) import the same types instead of redeclaring them.
 47. **Generate a Go-compatible schema for project-portal** — Since project-portal-backend is Go, produce an OpenAPI/JSON-schema contract it can codegen from.
-48. **Add an OpenAPI spec for agent-service's own routes** — Document `/agents/*/run` request/response shapes for API consumers.
 49. **Version the agent run API** — Decide on a versioning strategy (`/v1/agents/...`) before external callers depend on the current shape.
 50. **Add a shared `AgentCitation` validation rule** — Enforce that compliance-facing agents cannot return `status: "drafted"` without at least one citation.
 
@@ -74,7 +68,6 @@ Entries already filed as GitHub issues (labeled `agent-service`) are removed fro
 53. **Implement `getComplianceFramework(framework)`** — Fetch framework-specific reporting requirements from the `csrd`/`cbam`/`corsia`/`sbti`/`ghg-protocol` modules.
 54. **Implement `getRetirementHistory(companyId)`** — Back the compliance-report agent's evidence-gathering tool.
 55. **Implement `getAuditTrailEntries(companyId, period)`** — Pull prior audit-trail records into compliance-report evidence.
-56. **Add auth token injection for corporate-platform client calls** — Ensure the client sends whatever credential corporate-platform-backend's guards expect, once decided in issue #38.
 57. **Add retry logic to the corporate-platform HTTP client** — Handle transient 5xx/network failures from corporate-platform-backend gracefully.
 58. **Add response schema validation for corporate-platform client calls** — Validate responses with Zod so a backend contract change fails loudly instead of silently.
 59. **Add a mock/fixture mode for the corporate-platform client** — Let agent developers run agents locally without a live corporate-platform-backend instance.
@@ -92,7 +85,6 @@ Entries already filed as GitHub issues (labeled `agent-service`) are removed fro
 69. **Add auth token injection for project-portal client calls** — Ensure the client sends whatever credential project-portal-backend's `internal/auth` package expects.
 70. **Add retry logic to the project-portal HTTP client** — Handle transient 5xx/network failures from project-portal-backend gracefully.
 71. **Add response schema validation for project-portal client calls** — Validate responses with Zod so a Go backend contract change fails loudly instead of silently.
-72. **Add a mock/fixture mode for the project-portal client** — Let agent developers run agents locally without a live project-portal-backend instance.
 73. **Write integration tests against a project-portal-backend test instance** — Verify the client's real HTTP calls against actual API contracts, not just mocks.
 74. **Add request/response logging for project-portal client calls** — Make it possible to debug what data an agent actually saw when investigating a bad output.
 
@@ -145,7 +137,6 @@ Entries already filed as GitHub issues (labeled `agent-service`) are removed fro
 
 115. **Finish `get_monitoring_signals` tool implementation** — Call the real satellite/IoT/weather client methods once issues #64–68 land.
 116. **Add an escalation-decision output field** — Have the agent return a clear escalate/suppress/needs-more-data verdict, not just prose.
-117. **Wire escalation to project-portal's notification pipeline** — Once approved, actually push a confirmed alert into `internal/notifications`.
 118. **Add a false-positive feedback loop** — Let a human's "this wasn't real" correction be logged and used to tune future triage decisions.
 119. **Add a triage-latency budget** — Since alerts are time-sensitive, cap how long this agent run is allowed to take before falling back to the existing rule-based alert.
 120. **Write unit tests for `alert-triage.tools.ts`** — Test `get_monitoring_signals` input validation independent of the LLM loop.
@@ -162,7 +153,6 @@ Entries already filed as GitHub issues (labeled `agent-service`) are removed fro
 128. **Add end-to-end tests spanning agent-service → project-portal-backend** — Run against a docker-composed stack to catch cross-service contract drift.
 129. **Add test coverage reporting to CI** — Extend `.github/workflows/agent-service.yml` with a coverage step and a minimum-coverage gate.
 130. **Add contract tests for the Anthropic tool schemas** — Verify each `betaZodTool` input schema stays in sync with what its `run` function expects.
-131. **Add load testing for concurrent agent runs** — Establish how many simultaneous LLM-backed requests the service can handle before degrading.
 132. **Add a test double for the Anthropic client** — Let agent logic be tested without making real API calls, for fast CI runs.
 133. **Add snapshot tests for each agent's system prompt** — Catch accidental prompt-wording regressions during refactors.
 134. **Add tests for the audit log's failure modes** — Verify agent runs behave correctly when the audit sink is unavailable.
