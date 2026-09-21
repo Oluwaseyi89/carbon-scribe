@@ -1,10 +1,9 @@
-Study this workspace and see how Issues are to be written   in ISSUE_PATTERN.md.
-Output each written issue in ISSUES_OUTPUT.md and demarcate from successive issue by '---------' line.
-I want to generate 18 issues across project-portal, corporate-platform and stellar-core.
-Check the minimal issue titles in project-portal/WAVE_FIVE_ISSUES.md and generate 3 issues each for web and backend.
-Check the minimal issue titles in corporate/WAVE_FIVE_ISSUES.md and generate 3 issues each for web and backend.
-Check the minimal issue titles in stellar-core/PRE_MAINNET.md and generate 1 issue each across the smart contracts directories.
-Ensure to understand the approriate codebase before generate the issues relating to it.
+I want you to help me create 30 issues based on the minimal titles and their respective descriptions in the following files in an equitable manner that the issues will all be in their right proportions to consumate total issues to be created:
 
+1. Read ./project-portal/WAVE_FIVE_ISSUES.md and create web and backend issues.
+2. Read ./corporate-platform/WAVE_FIVE_ISSUES.md and create web and backend issues.
+3. Read ./stellar-core/PRE_MAINNET.md and create smart contract issues across the contracts in equal proportion.
 
+Visit https://github.com/CarbonScribe/carbon-scribe/issues and create the issues; ensuring to learn how their kind of issues are assigned label and do according. Except do not add the "Stellar Wave" label yet; I will do that myself.
 
+When done delete the issues titles (which were expanded as the created issues) in their respective files.
