@@ -20,6 +20,7 @@ type Config struct {
 	Settings      SettingsConfig
 	Auth          AuthConfig
 	Redis         RedisConfig
+	RateLimit     RateLimitConfig
 	Soroban       SorobanConfig
 	Notifications NotificationsConfig
 }
@@ -77,6 +78,32 @@ type RedisConfig struct {
 	Port     string
 	Password string
 	DB       int
+}
+
+// RateLimitConfig holds per-route rate limiting configuration.
+type RateLimitConfig struct {
+	// Auth endpoints
+	LoginMaxRequests          int    // attempts per window (default: 5)
+	LoginWindowSeconds        int    // window in seconds (default: 900 — 15 min)
+	RegisterMaxRequests       int    // default: 3
+	RegisterWindowSeconds     int    // default: 3600 — 1 hour
+	RefreshMaxRequests        int    // default: 10
+	RefreshWindowSeconds      int    // default: 3600 — 1 hour
+	ForgotPasswordMaxRequests int    // default: 3
+	ForgotPasswordWindowSecs  int    // default: 3600 — 1 hour
+	WalletChallengeMax        int    // default: 5
+	WalletChallengeWindowSecs int    // default: 60 — 1 min
+	// Minting / payment endpoints
+	MintMaxRequests     int // default: 10
+	MintWindowSeconds   int // default: 60
+	PaymentMaxRequests  int // default: 5
+	PaymentWindowSeconds int // default: 60
+	// Whitelist (comma-separated CIDRs or IPs that bypass rate limiting)
+	IPWhitelist string
+	// Graduated cooldown: lock duration multiplier after N consecutive violations
+	GraduatedCooldownEnabled     bool
+	GraduatedCooldownThreshold   int // violations before cooldown doubles (default: 3)
+	GraduatedCooldownBaseSeconds int // initial lock extension in seconds (default: 60)
 }
 
 type SorobanConfig struct {
@@ -186,6 +213,29 @@ func Load() (*Config, error) {
 			Port:     getEnvOrDefault("REDIS_PORT", "6379"),
 			Password: os.Getenv("REDIS_PASSWORD"),
 			DB:       redisDBAbc,
+		},
+		RateLimit: RateLimitConfig{
+			// Auth limits
+			LoginMaxRequests:          getIntOrDefault("RATE_LIMIT_LOGIN_MAX", 5),
+			LoginWindowSeconds:        getIntOrDefault("RATE_LIMIT_LOGIN_WINDOW_SECS", 900),
+			RegisterMaxRequests:       getIntOrDefault("RATE_LIMIT_REGISTER_MAX", 3),
+			RegisterWindowSeconds:     getIntOrDefault("RATE_LIMIT_REGISTER_WINDOW_SECS", 3600),
+			RefreshMaxRequests:        getIntOrDefault("RATE_LIMIT_REFRESH_MAX", 10),
+			RefreshWindowSeconds:      getIntOrDefault("RATE_LIMIT_REFRESH_WINDOW_SECS", 3600),
+			ForgotPasswordMaxRequests: getIntOrDefault("RATE_LIMIT_FORGOT_PASSWORD_MAX", 3),
+			ForgotPasswordWindowSecs:  getIntOrDefault("RATE_LIMIT_FORGOT_PASSWORD_WINDOW_SECS", 3600),
+			WalletChallengeMax:        getIntOrDefault("RATE_LIMIT_WALLET_CHALLENGE_MAX", 5),
+			WalletChallengeWindowSecs: getIntOrDefault("RATE_LIMIT_WALLET_CHALLENGE_WINDOW_SECS", 60),
+			// Minting / payment limits
+			MintMaxRequests:      getIntOrDefault("RATE_LIMIT_MINT_MAX", 10),
+			MintWindowSeconds:    getIntOrDefault("RATE_LIMIT_MINT_WINDOW_SECS", 60),
+			PaymentMaxRequests:   getIntOrDefault("RATE_LIMIT_PAYMENT_MAX", 5),
+			PaymentWindowSeconds: getIntOrDefault("RATE_LIMIT_PAYMENT_WINDOW_SECS", 60),
+			// Whitelist and graduated cooldown
+			IPWhitelist:                  os.Getenv("RATE_LIMIT_IP_WHITELIST"),
+			GraduatedCooldownEnabled:     getEnvOrDefault("RATE_LIMIT_GRADUATED_COOLDOWN", "true") == "true",
+			GraduatedCooldownThreshold:   getIntOrDefault("RATE_LIMIT_COOLDOWN_THRESHOLD", 3),
+			GraduatedCooldownBaseSeconds: getIntOrDefault("RATE_LIMIT_COOLDOWN_BASE_SECS", 60),
 		},
 		Soroban: SorobanConfig{
 			RPCURL:              getEnvOrDefault("SOROBAN_RPC_URL", "https://soroban-testnet.stellar.org"),

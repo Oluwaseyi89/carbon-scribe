@@ -43,7 +43,6 @@ export default function RegisterClient() {
       errors.full_name = 'Full name is required';
     }
 
-
     if (!email) {
       errors.email = 'Email is required';
     } else if (!emailRegex.test(email)) {
@@ -78,8 +77,15 @@ export default function RegisterClient() {
         password,
         organization: organization.trim() || undefined,
       });
-      showToast('success', response?.message || 'Account created. Please login to continue.');
-      router.replace('/login');
+      
+      // Show success toast with verification message
+      showToast(
+        'success',
+        `${response?.message || 'Account created! Please check your email to verify your account before logging in.'} A verification link has been sent to your email address.`
+      );
+      
+      // Redirect to verification prompt page instead of login
+      router.replace(`/verify-email-prompt?email=${encodeURIComponent(email)}`);
     } catch (err: any) {
       console.error('Register submission error:', err);
       showToast('error', err?.response?.data?.error || err?.message || 'Registration failed');

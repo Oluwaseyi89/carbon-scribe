@@ -2,12 +2,14 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { RetirementService } from './retirement.service';
 import { CarbonAssetService } from '../stellar/soroban/contracts/carbon-asset.service';
 import { IdempotencyService } from '../stellar/soroban/idempotency/idempotency.service';
+import { IdempotencyKeyService } from './idempotency/idempotency-key.service';
 import { ContractCallStatus } from '../stellar/soroban/interfaces/idempotency.interface';
 
 describe('RetirementService', () => {
   let service: RetirementService;
   let carbonAssetService: jest.Mocked<CarbonAssetService>;
   let idempotencyService: jest.Mocked<IdempotencyService>;
+  let idempotencyKeyService: jest.Mocked<IdempotencyKeyService>;
 
   beforeEach(async () => {
     // Create mocks
@@ -45,6 +47,10 @@ describe('RetirementService', () => {
       hashArguments: jest.fn(),
     } as any;
 
+    idempotencyKeyService = {
+      recordFailedCall: jest.fn(),
+    } as any;
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         RetirementService,
@@ -55,6 +61,10 @@ describe('RetirementService', () => {
         {
           provide: IdempotencyService,
           useValue: idempotencyService,
+        },
+        {
+          provide: IdempotencyKeyService,
+          useValue: idempotencyKeyService,
         },
       ],
     }).compile();

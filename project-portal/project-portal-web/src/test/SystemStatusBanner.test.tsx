@@ -14,6 +14,7 @@ const defaultHealthState = {
     isFetchingAlerts: false,
     isFetchingDependencies: false,
     isAcknowledgingAlert: false,
+    isFetchingUptime: false,
   },
   healthErrors: {
     status: null,
@@ -22,8 +23,10 @@ const defaultHealthState = {
     alerts: null,
     dependencies: null,
     acknowledge: null,
+    uptime: null,
   },
   fetchDetailedStatus: vi.fn(),
+  fetchUptimeStats: vi.fn(),
 }
 
 const createDetailedStatus = (overrides: Partial<SystemStatusSnapshot> = {}): SystemStatusSnapshot => ({
@@ -134,7 +137,7 @@ describe('SystemStatusBanner', () => {
     expect(mockFetchDetailedStatus).toHaveBeenCalledTimes(1)
 
     act(() => {
-      vi.advanceTimersByTime(30_000)
+      vi.advanceTimersByTime(60_000)
     })
 
     expect(mockFetchDetailedStatus).toHaveBeenCalledTimes(2)

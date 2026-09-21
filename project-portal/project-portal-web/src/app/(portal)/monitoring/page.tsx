@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { useStore } from '@/lib/store/store';
 
 // Dashboard
@@ -113,6 +113,7 @@ export default function SystemHealthDashboard() {
   const fetchUptimeStats = useStore(state => state.fetchUptimeStats);
   const clearHealthData = useStore(state => state.clearHealthData);
   const isAuthenticated = useStore(state => state.isAuthenticated);
+  const chartContainerRef = useRef<HTMLDivElement>(null);
 
   // Derive loading state from health store slice
   const statusLoading = useStore(state => state.healthLoading?.isFetchingStatus ?? false);
@@ -227,11 +228,11 @@ export default function SystemHealthDashboard() {
                 <div className="flex flex-wrap items-center gap-3">
                   <MetricSelector />
                   <ChartControls />
-                  <ChartExport />
+                  <ChartExport chartRef={chartContainerRef} />
                 </div>
               )}
             </div>
-            {metricsLoading ? <ChartSkeleton /> : <MetricsTimeSeries />}
+            {metricsLoading ? <ChartSkeleton /> : <MetricsTimeSeries chartRef={chartContainerRef} />}
           </section>
 
           <section aria-label="Service Topology" aria-busy={servicesLoading}>

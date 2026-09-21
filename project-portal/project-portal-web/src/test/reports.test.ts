@@ -324,8 +324,8 @@ describe("Reports API client", () => {
       };
       mockFetch({ datasets: [ds] });
       const result = await apiGetDatasets();
-      expect(result).toHaveLength(1);
-      expect(result[0].name).toBe("projects");
+      expect(result.datasets).toHaveLength(1);
+      expect(result.datasets[0].name).toBe("projects");
     });
   });
 

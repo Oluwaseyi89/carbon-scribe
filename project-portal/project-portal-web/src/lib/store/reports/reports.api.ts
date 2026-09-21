@@ -66,14 +66,17 @@ export async function apiCreateReport(
   });
 }
 
-export async function apiListReports(params?: {
-  category?: string;
-  visibility?: string;
-  is_template?: boolean;
-  search?: string;
-  page?: number;
-  page_size?: number;
-}): Promise<ListReportsResponse> {
+export async function apiListReports(
+  params?: {
+    category?: string;
+    visibility?: string;
+    is_template?: boolean;
+    search?: string;
+    page?: number;
+    page_size?: number;
+  },
+  config?: { signal?: AbortSignal },
+): Promise<ListReportsResponse> {
   const q = new URLSearchParams();
   if (params?.category) q.set("category", params.category);
   if (params?.visibility) q.set("visibility", params.visibility);
@@ -86,6 +89,7 @@ export async function apiListReports(params?: {
   return reportsRequest<ListReportsResponse>({
     method: "GET",
     url: `reports?${q.toString()}`,
+    signal: config?.signal,
   });
 }
 
@@ -190,12 +194,19 @@ export async function apiCancelExecution(executionId: string): Promise<void> {
   });
 }
 
-export async function apiGetDatasets(): Promise<DatasetMetadata[]> {
-  const data = await reportsRequest<{ datasets: DatasetMetadata[] }>({
+export async function apiGetDatasets(params?: {
+  page?: number;
+  pageSize?: number;
+}): Promise<{ datasets: DatasetMetadata[]; total?: number }> {
+  const q = new URLSearchParams();
+  if (params?.page !== undefined) q.set("page", String(params.page));
+  if (params?.pageSize !== undefined) q.set("page_size", String(params.pageSize));
+
+  const data = await reportsRequest<{ datasets: DatasetMetadata[]; total?: number }>({
     method: "GET",
-    url: "reports/datasets",
+    url: `reports/datasets${q.toString() ? `?${q.toString()}` : ""}`,
   });
-  return data?.datasets ?? [];
+  return { datasets: data?.datasets ?? [], total: data?.total ?? data?.datasets?.length ?? 0 };
 }
 
 export async function apiGetDashboardSummary(): Promise<DashboardSummary> {

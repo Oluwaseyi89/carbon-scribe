@@ -2,6 +2,31 @@ import { Injectable, Logger } from '@nestjs/common';
 import { CarbonAssetService } from '../stellar/soroban/contracts/carbon-asset.service';
 import { IdempotencyService } from '../stellar/soroban/idempotency/idempotency.service';
 import { DuplicateStrategy } from '../stellar/soroban/interfaces/idempotency.interface';
+import { IdempotencyKeyService } from './idempotency/idempotency-key.service';
+import { InvalidRetirementAmountError } from '../shared/exceptions/error-classes';
+
+export interface RetirementResult {
+  success: boolean;
+  cached: boolean;
+  isDuplicate?: boolean;
+  transactionHash?: string;
+  result?: unknown;
+  workflowId: string;
+  callId?: string;
+  originalCallId?: string;
+  idempotencyKey?: string;
+}
+
+export interface RetirementStatusResult {
+  found: boolean;
+  status: string;
+  transactionHash?: string;
+  result?: unknown;
+  submittedAt?: Date;
+  confirmedAt?: Date | null;
+  isDuplicate?: boolean;
+  workflowId: string;
+}
 
 @Injectable()
 export class RetirementService {
@@ -10,6 +35,7 @@ export class RetirementService {
   constructor(
     private readonly carbonAssetService: CarbonAssetService,
     private readonly idempotencyService: IdempotencyService,
+    private readonly idempotencyKeyService: IdempotencyKeyService,
   ) {}
 
   /**
@@ -20,7 +46,11 @@ export class RetirementService {
    * @param creditId - The credit ID to retire
    * @param amount - The amount of credits to retire
    * @param purpose - The purpose of the retirement
+   * @param idempotencyKey - Optional client-provided idempotency key
    * @returns Retirement result with idempotency information
+   * @throws {CreditNotFoundError} if credit not found
+   * @throws {InsufficientCreditsError} if insufficient credits available
+   * @throws {InvalidRetirementAmountError} if amount is invalid
    */
   async retireCredits(
     companyId: string,
@@ -28,8 +58,17 @@ export class RetirementService {
     creditId: string,
     amount: number,
     purpose: string,
-  ): Promise<any> {
-    const workflowId = `retirement-${creditId}-${Date.now()}`;
+    idempotencyKey?: string,
+  ): Promise<RetirementResult> {
+    // Validate amount
+    if (amount <= 0) {
+      throw new InvalidRetirementAmountError(amount, 1);
+    }
+
+    // Use client-provided key if available, otherwise generate one
+    const workflowId = idempotencyKey
+      ? `retirement-${idempotencyKey}`
+      : `retirement-${creditId}-${Date.now()}`;
 
     this.logger.log(`Processing retirement for workflow ${workflowId}`, {
       companyId,
@@ -37,12 +76,14 @@ export class RetirementService {
       creditId,
       amount,
       purpose,
+      idempotencyKey,
     });
 
-    // Check if already processed
+    // Check if already processed (using the client-provided key if available)
+    const lookupKey = idempotencyKey || workflowId;
     const isProcessed = await this.idempotencyService.isWorkflowProcessed(
       companyId,
-      workflowId,
+      lookupKey,
       'retire',
     );
 
@@ -50,11 +91,18 @@ export class RetirementService {
       // Return cached result
       const call = await this.idempotencyService.getContractCallByWorkflow(
         companyId,
-        workflowId,
+        lookupKey,
         'retire',
       );
 
-      this.logger.log(`Returning cached result for workflow ${workflowId}`);
+      if (!call) {
+        throw new Error('Cached call not found despite being processed');
+      }
+
+      this.logger.log(`Returning cached result for workflow ${workflowId}`, {
+        idempotencyKey,
+        cached: true,
+      });
 
       return {
         success: true,
@@ -63,15 +111,16 @@ export class RetirementService {
         result: call.result,
         workflowId,
         callId: call.id,
+        idempotencyKey,
       };
     }
 
     try {
-      // Execute with idempotency - added companyId to the payload
+      // Execute with idempotency
       const result = await this.carbonAssetService.invokeWithIdempotency(
         companyId,
         {
-          companyId, // <-- Added missing companyId property
+          companyId,
           methodName: 'retire',
           args: [
             { type: 'u32', value: parseInt(creditId, 10) },
@@ -79,7 +128,8 @@ export class RetirementService {
           ],
         },
         {
-          workflowId,
+          workflowId: lookupKey,
+          idempotencyKey,
           metadata: { userId, purpose, creditId },
         },
         DuplicateStrategy.RETURN_CACHED,
@@ -89,6 +139,7 @@ export class RetirementService {
         transactionHash: result.transactionHash,
         isDuplicate: result.isDuplicate,
         isCached: result.isCached,
+        idempotencyKey,
       });
 
       return {
@@ -99,14 +150,27 @@ export class RetirementService {
         callId: result.callId,
         workflowId: result.workflowId,
         result: result.result,
-        // 💡 FIXED: Forward the originalCallId field to pass the duplicate handling test
         originalCallId: result.originalCallId,
+        idempotencyKey,
       };
     } catch (error) {
+      const err = error as Error;
       this.logger.error(`Retirement failed for workflow ${workflowId}`, {
-        error: error.message,
-        stack: error.stack,
+        error: err.message,
+        stack: err.stack,
+        idempotencyKey,
       });
+
+      // If we have an idempotency key, record the failure
+      if (idempotencyKey) {
+        await this.idempotencyKeyService['recordFailedCall'](
+          idempotencyKey,
+          companyId,
+          err.message,
+        );
+      }
+
+      // Re-throw with proper domain error
       throw error;
     }
   }
@@ -117,7 +181,7 @@ export class RetirementService {
   async getRetirementStatus(
     companyId: string,
     workflowId: string,
-  ): Promise<any> {
+  ): Promise<RetirementStatusResult> {
     const call = await this.idempotencyService.getContractCallByWorkflow(
       companyId,
       workflowId,

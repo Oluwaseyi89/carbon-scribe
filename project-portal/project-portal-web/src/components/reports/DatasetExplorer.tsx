@@ -2,19 +2,39 @@
 
 import { useEffect } from "react";
 import { useStore } from "@/lib/store/store";
-import { Database, Loader2, ChevronDown, ChevronRight } from "lucide-react";
+import { Database, Loader2, ChevronDown, ChevronRight, ChevronLeft } from "lucide-react";
 import { useState } from "react";
 
+const PAGE_SIZE = 8;
+
 export default function DatasetExplorer() {
-  const { datasets, datasetsLoading, datasetsError, fetchDatasets } =
-    useStore();
+  const {
+    datasets,
+    datasetsLoading,
+    datasetsError,
+    datasetsPage,
+    datasetsPageSize,
+    datasetsTotal,
+    datasetsHasMore,
+    fetchDatasets,
+  } = useStore();
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [loadingMore, setLoadingMore] = useState(false);
 
   useEffect(() => {
-    fetchDatasets();
+    void fetchDatasets({ page: 1, pageSize: PAGE_SIZE });
   }, [fetchDatasets]);
 
-  if (datasetsLoading && datasets.length === 0) {
+  const handlePageChange = async (nextPage: number) => {
+    setLoadingMore(true);
+    try {
+      await fetchDatasets({ page: nextPage, pageSize: datasetsPageSize || PAGE_SIZE });
+    } finally {
+      setLoadingMore(false);
+    }
+  };
+
+  if ((datasetsLoading && datasets.length === 0) || (loadingMore && datasets.length === 0)) {
     return (
       <div className="flex items-center justify-center py-12">
         <Loader2 className="w-8 h-8 animate-spin text-emerald-600" />
@@ -115,6 +135,40 @@ export default function DatasetExplorer() {
           );
         })}
       </div>
+
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border border-gray-200 rounded-xl bg-white p-4">
+        <div className="text-sm text-gray-600">
+          Page {datasetsPage} of {Math.max(1, Math.ceil((datasetsTotal || 0) / (datasetsPageSize || PAGE_SIZE)))}
+          {datasetsTotal ? ` • ${datasetsTotal} total datasets` : ''}
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => void handlePageChange(Math.max(1, datasetsPage - 1))}
+            disabled={datasetsPage <= 1 || loadingMore}
+            className="inline-flex items-center gap-1 rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            <ChevronLeft className="h-4 w-4" />
+            Prev
+          </button>
+          <button
+            type="button"
+            onClick={() => void handlePageChange(datasetsPage + 1)}
+            disabled={!datasetsHasMore || loadingMore}
+            className="inline-flex items-center gap-1 rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            Next
+            <ChevronRight className="h-4 w-4" />
+          </button>
+        </div>
+      </div>
+
+      {loadingMore && (
+        <div className="flex items-center justify-center py-2 text-sm text-gray-500">
+          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+          Loading next page…
+        </div>
+      )}
     </div>
   );
 }

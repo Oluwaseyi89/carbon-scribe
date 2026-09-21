@@ -4,7 +4,8 @@ import {
     ServiceHealthCheck,
     SystemMetric,
     SystemAlert,
-    ServiceDependency
+    ServiceDependency,
+    UptimeStat,
 } from './health.types';
 
 export const fetchDetailedStatusApi = async (): Promise<SystemStatusSnapshot> => {
@@ -38,7 +39,11 @@ export const fetchDependenciesApi = async (): Promise<ServiceDependency[]> => {
     return response.data;
 };
 
-export const fetchUptimeApi = async (): Promise<any> => {
-    const response = await apiClient.get<any>('/health/uptime');
+/**
+ * Fetch uptime statistics from the API
+ * Returns an array of uptime stats for different periods (7d, 30d, 90d)
+ */
+export const fetchUptimeApi = async (): Promise<UptimeStat[]> => {
+    const response = await apiClient.get<UptimeStat[]>('/health/uptime');
     return response.data;
 };

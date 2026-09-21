@@ -9,6 +9,7 @@
  */
 
 import { reportError } from '@/lib/telemetry/errorReporter';
+import { isClient, safeGetItem, safeSetItem, safeRemoveItem } from '@/lib/utils/hydration';
 
 const ACCESS_TOKEN_KEY = 'cs_access_token';
 const REFRESH_TOKEN_KEY = 'cs_refresh_token';
@@ -25,14 +26,14 @@ export interface TokenData {
  * Store authentication tokens securely
  */
 export function storeTokens(accessToken: string, refreshToken: string, expiresIn: number = 900): void {
-  if (typeof window === 'undefined') return;
+  if (!isClient()) return;
 
   const expiresAt = Date.now() + expiresIn * 1000;
   
   try {
-    localStorage.setItem(ACCESS_TOKEN_KEY, accessToken);
-    localStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
-    localStorage.setItem(TOKEN_EXPIRY_KEY, expiresAt.toString());
+    safeSetItem(ACCESS_TOKEN_KEY, accessToken);
+    safeSetItem(REFRESH_TOKEN_KEY, refreshToken);
+    safeSetItem(TOKEN_EXPIRY_KEY, expiresAt.toString());
   } catch (error) {
     reportError(error, 'token-storage', 'warning', { operation: 'storeTokens' });
   }
@@ -42,20 +43,20 @@ export function storeTokens(accessToken: string, refreshToken: string, expiresIn
  * Get the stored access token
  */
 export function getAccessToken(): string | null {
-  if (typeof window === 'undefined') return null;
+  if (!isClient()) return null;
   
   try {
-    let token = localStorage.getItem(ACCESS_TOKEN_KEY);
+    let token = safeGetItem(ACCESS_TOKEN_KEY);
     
     // Migration from legacy keys
     if (!token) {
       const legacyKeys = ['accessToken', 'access_token'];
       for (const key of legacyKeys) {
-        const legacyToken = localStorage.getItem(key);
+        const legacyToken = safeGetItem(key);
         if (legacyToken) {
           token = legacyToken;
-          localStorage.setItem(ACCESS_TOKEN_KEY, token);
-          legacyKeys.forEach(k => localStorage.removeItem(k));
+          safeSetItem(ACCESS_TOKEN_KEY, token);
+          legacyKeys.forEach(k => safeRemoveItem(k));
           break;
         }
       }
@@ -72,10 +73,10 @@ export function getAccessToken(): string | null {
  * Get the stored refresh token
  */
 export function getRefreshToken(): string | null {
-  if (typeof window === 'undefined') return null;
+  if (!isClient()) return null;
   
   try {
-    return localStorage.getItem(REFRESH_TOKEN_KEY);
+    return safeGetItem(REFRESH_TOKEN_KEY);
   } catch (error) {
     reportError(error, 'token-storage', 'warning', { operation: 'getRefreshToken' });
     return null;
@@ -86,10 +87,10 @@ export function getRefreshToken(): string | null {
  * Get token expiry timestamp
  */
 export function getTokenExpiry(): number | null {
-  if (typeof window === 'undefined') return null;
+  if (!isClient()) return null;
   
   try {
-    const expiry = localStorage.getItem(TOKEN_EXPIRY_KEY);
+    const expiry = safeGetItem(TOKEN_EXPIRY_KEY);
     return expiry ? parseInt(expiry, 10) : null;
   } catch (error) {
     reportError(error, 'token-storage', 'warning', { operation: 'getTokenExpiry' });
@@ -120,13 +121,13 @@ export function hasRefreshToken(): boolean {
  * Clear all authentication data
  */
 export function clearAuthData(): void {
-  if (typeof window === 'undefined') return;
+  if (!isClient()) return;
   
   try {
-    localStorage.removeItem(ACCESS_TOKEN_KEY);
-    localStorage.removeItem(REFRESH_TOKEN_KEY);
-    localStorage.removeItem(TOKEN_EXPIRY_KEY);
-    localStorage.removeItem(USER_KEY);
+    safeRemoveItem(ACCESS_TOKEN_KEY);
+    safeRemoveItem(REFRESH_TOKEN_KEY);
+    safeRemoveItem(TOKEN_EXPIRY_KEY);
+    safeRemoveItem(USER_KEY);
   } catch (error) {
     reportError(error, 'token-storage', 'warning', { operation: 'clearAuthData' });
   }
@@ -136,10 +137,10 @@ export function clearAuthData(): void {
  * Store user data
  */
 export function storeUser(user: any): void {
-  if (typeof window === 'undefined') return;
+  if (!isClient()) return;
   
   try {
-    localStorage.setItem(USER_KEY, JSON.stringify(user));
+    safeSetItem(USER_KEY, JSON.stringify(user));
   } catch (error) {
     reportError(error, 'token-storage', 'warning', { operation: 'storeUser' });
   }
@@ -149,10 +150,10 @@ export function storeUser(user: any): void {
  * Get stored user data
  */
 export function getUser(): any | null {
-  if (typeof window === 'undefined') return null;
+  if (!isClient()) return null;
   
   try {
-    const userStr = localStorage.getItem(USER_KEY);
+    const userStr = safeGetItem(USER_KEY);
     return userStr ? JSON.parse(userStr) : null;
   } catch (error) {
     reportError(error, 'token-storage', 'warning', { operation: 'getUser' });

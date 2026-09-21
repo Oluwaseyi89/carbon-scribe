@@ -11,6 +11,16 @@ export interface ProjectGeometry {
   geometry: Geometry;
   createdAt: string;
   updatedAt: string;
+  center?: {
+    lng: number;
+    lat: number;
+  };
+  areaHectares?: number;
+  carbonData?: {
+    density: number;
+    total: number;
+    unit: string;
+  };
 }
 
 export interface Geofence {
@@ -46,6 +56,7 @@ export interface SatelliteImage {
   resolution?: number;
   ndvi?: number;
   geometry?: Geometry;
+  url?: string;
 }
 
 export interface SatelliteTimeSeries {
