@@ -1,4 +1,4 @@
-I want you to help me create 40 issues based on the minimal titles and their respective descriptions in the following files in an equitable manner that the issues will all be in their right proportions to consumate total issues to be created:
+I want you to help me create 40 issues based on the minimal titles and their respective descriptions in the following files in an equitable manner that the issues will all be in their right proportions to consumate total issues to be created (note that the codebase should be read for better understanding and also see issue writing pattern in ISSUE_PATTERN.md):
 
 1. Read ./project-portal/WAVE_FIVE_ISSUES.md and create web and backend issues.
 2. Read ./corporate-platform/WAVE_FIVE_ISSUES.md and create web and backend issues.
