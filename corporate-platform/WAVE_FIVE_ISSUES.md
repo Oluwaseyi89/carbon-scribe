@@ -85,17 +85,11 @@ The items below are intended as real production-readiness issues from the curren
 48. FE-048: Add currency and numeric localization strategy
    Format prices, tonnage, percentages, and quantities consistently so global users can interpret marketplace and reporting data correctly.
 
-49. FE-049: Add CSV export support for key enterprise tables
-   Enable operational teams to export portfolio, retirement, and document records without relying only on screenshots or manual copying.
-
 50. FE-050: Add PDF export consistency checks for frontend-generated report requests
    Validate request parameters before sending export jobs so users do not submit incomplete or contradictory reporting payloads.
 
 51. FE-051: Add frontend safeguards around destructive document deletion
    Require clear confirmation and recovery guidance before unpinning or deleting IPFS-linked artifacts.
-
-52. FE-052: Add document upload size and type prevalidation
-   Reject files client-side before transfer when they violate backend or Pinata expectations to reduce failed upload churn.
 
 
 55. FE-055: Add integrity verification status surfacing for IPFS documents
@@ -148,9 +142,6 @@ The items below are intended as real production-readiness issues from the curren
 73. FE-073: Add transfer retry UX for idempotent blockchain operations
    Guide users through safe retry semantics when transaction submission times out but eventual chain confirmation is uncertain.
 
-74. FE-074: Add transaction history search and filtering
-   Make the Stellar transfer center usable at enterprise volume by supporting lookup by status, wallet, amount, and date.
-
 75. FE-075: Add portfolio-to-transfer linkage in the UI
    Let users trace a purchased credit from marketplace acquisition through transfer to retirement without leaving the app context.
 
@@ -188,9 +179,6 @@ The items below are intended as real production-readiness issues from the curren
 
 89. FE-089: Add marketplace deep-linking for saved searches
    Let users share or bookmark complex discovery filters for repeated procurement workflows.
-
-90. FE-090: Add credit listing provenance panel on marketplace detail pages
-   Surface underlying methodology, issuer, vintage, and verification references so buyers can assess trust without leaving the page.
 
 
 92. FE-092: Add auction reconnection and state resync behavior
@@ -238,14 +226,8 @@ The items below are intended as real production-readiness issues from the curren
 106. FE-106: Add export support for audit trail views
    Allow compliance teams to export audit logs for external review rather than manually copying screen data.
 
-107. FE-107: Add integrity status badges to audit records
-   Surface whether audit events are locally stored, hash-chained, or chain-anchored so users understand evidentiary strength.
-
 108. FE-108: Add document-to-audit cross-linking in the UI
    Let users navigate from an uploaded certificate or evidence file to the actions and retirements it supports.
-
-109. FE-109: Add team invitation lifecycle UI states
-   Show sent, accepted, expired, revoked, and failed invitation statuses so admin users can manage access cleanly.
 
 110. FE-110: Add role-change confirmation and impact preview in team management
    Explain what permissions will change before admins update a user’s role.
@@ -264,9 +246,6 @@ The items below are intended as real production-readiness issues from the curren
 
 116. FE-116: Add public-route shell consistency for auth pages
    Make login, register, forgot-password, and reset-password pages share one polished unauthenticated layout rather than mixed shell behavior.
-
-117. FE-117: Add safe redirect handling after login
-   Validate post-login redirect targets so the app does not enable open-redirect style behavior through untrusted route params.
 
 118. FE-118: Add frontend rate-limit handling for auth and bid actions
    Surface retry windows and lockouts cleanly when the backend throttles sensitive operations.
@@ -378,9 +357,6 @@ The items below are intended as real production-readiness issues from the curren
 15. BE-015: Add certificate regeneration workflow for broken IPFS artifacts
    Provide an explicit recovery path when prior certificate uploads were stored with fallback or invalid storage metadata.
 
-16. BE-016: Add observability for IPFS latency, failure, and fallback rates
-   Expose metrics and alerts so the team can detect document durability regressions before customers do.
-
 
 20. BE-020: Add explicit placeholder-secret detection across config
    Reject values like demo passwords, mock keys, and local bypass tokens during deployment validation.
@@ -394,15 +370,9 @@ The items below are intended as real production-readiness issues from the curren
 23. BE-023: Add production-safe config documentation and examples
    Update operational docs so contributors and deployers do not copy development-only settings into shared environments.
 
-25. BE-025: Add request body size limits at the Nest application layer
-   Protect the service from oversized payloads and accidental memory exhaustion during uploads and bulk operations.
-
 
 30. BE-030: Add idempotency keys for order checkout and payment-adjacent flows
    Prevent duplicated orders or downstream processing when clients repeat uncertain purchase operations.
-
-31. BE-031: Add correlation IDs to every inbound request and emitted event
-   Propagate one traceable identifier across APIs, jobs, and webhooks so production debugging becomes practical.
 
 
 35. BE-035: Add OpenTelemetry or equivalent distributed tracing
@@ -440,9 +410,6 @@ The items below are intended as real production-readiness issues from the curren
 48. BE-048: Add retry classification for event publishing failures
    Distinguish transient broker errors from serialization or configuration faults so retries are safe and meaningful.
 
-49. BE-049: Add exactly-once or deduplication semantics for critical event consumers
-   Prevent duplicate downstream effects when events are replayed or consumed more than once.
-
 50. BE-050: Document degraded-mode behavior when Kafka is intentionally disabled
    Make it clear which features continue, which queue, and which fail so operators and frontend developers can plan appropriately.
 
@@ -466,9 +433,6 @@ The items below are intended as real production-readiness issues from the curren
 
 60. BE-060: Add network-aware explorer and verification URLs in responses
    Ensure returned transaction and certificate links always match the configured network so compliance evidence remains trustworthy.
-
-61. BE-061: Add contract ABI and method compatibility validation
-   Verify that configured contract IDs support the expected methods before runtime invocation attempts begin.
 
 62. BE-062: Add backlog processing for unconfirmed contract calls
    Reconcile pending chain records in the background so statuses do not remain stuck after temporary RPC failures.
@@ -524,9 +488,6 @@ The items below are intended as real production-readiness issues from the curren
 79. BE-079: Add archival policy for high-volume audit and activity tables
    Move older data to cheaper storage or partitions so primary database performance does not erode over time.
 
-80. BE-080: Add row-level access tests for multi-tenant data boundaries
-   Prove through integration tests that every sensitive query enforces company isolation under realistic request paths.
-
 
 82. BE-082: Add system-wide authorization audit for every controller action
    Verify that all routes consistently enforce JWT, API key, RBAC, and tenant guards where appropriate.
@@ -572,9 +533,6 @@ The items below are intended as real production-readiness issues from the curren
 98. BE-098: Add outbound webhook delivery observability and replay tooling
    Track delivery success, retries, and manual replay so customers can trust external notification workflows.
 
-99. BE-099: Add webhook idempotency and deduplication support
-   Prevent duplicate downstream side effects when partners resend the same callback or our retries overlap.
-
 100. BE-100: Add per-tenant webhook isolation and limits
    Ensure one noisy customer cannot exhaust webhook delivery resources for other tenants.
 
@@ -618,9 +576,6 @@ The items below are intended as real production-readiness issues from the curren
 
 115. BE-115: Add portfolio snapshot materialization for heavy reporting workloads
    Precompute key aggregates so enterprise dashboards do not recalculate expensive summaries on every request.
-
-116. BE-116: Add cache invalidation rules for portfolio and analytics endpoints
-   Ensure Redis-backed or in-memory caches are refreshed correctly after purchases, transfers, and retirements.
 
 117. BE-117: Add cache key namespacing by tenant and permission scope
    Prevent accidental cross-tenant leakage through shared cache entries.

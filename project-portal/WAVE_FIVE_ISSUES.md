@@ -15,8 +15,6 @@
 
 12. **Implement biomass estimator** — `internal/monitoring/processing/biomass_estimator.go` is future-tagged and biomass data cannot be produced for credit verification.
 
-13. **Implement analytics trends service** — `internal/monitoring/analytics/trends.go` is future-gated so historical trend reports cannot be generated from monitoring data.
-
 ---
 
 ### 🔴 Notifications Module (All Behind `//go:build future`)
@@ -27,8 +25,6 @@
 19. **Build notification rules evaluator** — `internal/notifications/rules/evaluator.go` is future-gated and without it rule predicates are never checked against incoming events.
 
 20. **Implement notification rules scheduler** — `internal/notifications/rules/scheduler.go` is future-gated, meaning time-based notification schedules (daily digests, weekly reports) cannot fire.
-
-21. **Build notification template manager** — `internal/notifications/templates/manager.go` is future-tagged and there is no way to create or update notification templates at runtime.
 
 23. **Build notification template store** — `internal/notifications/templates/store.go` is future-gated and templates cannot be persisted or read from any storage backend.
 
@@ -50,8 +46,6 @@
 
 
 32. **Implement breach monitor worker** — `cmd/workers/breach_monitor.go` is future-gated and geofence breach detection is never evaluated on a continuous basis.
-
-33. **Implement data cleanup worker** — `cmd/workers/cleanup_worker.go` is future-gated so expired tokens, soft-deleted records, and temp uploads are never purged.
 
 34. **Implement compliance audit worker** — `cmd/workers/compliance_audit_worker.go` is future-gated and scheduled compliance audit report generation never runs.
 
@@ -113,8 +107,6 @@
 
 59. **Implement real outbound connectivity test for each provider** — `TestConnection` simulates success with a hardcoded 45 ms dummy latency value instead of making an actual network request to the provider.
 
-60. **Implement webhook delivery retry queue** — `TriggerWebhook` has no retry mechanism, so a single failed webhook delivery is permanently lost.
-
 61. **Add HMAC-SHA256 signature validation for incoming webhooks** — No signature header is verified on inbound webhook payloads, allowing any external party to forge platform events.
 
 
@@ -134,8 +126,6 @@
 ---
 
 ### 🟠 Quality Scoring
-
-68. **Fix nil database injection in RecalculateScore** — `methodology.NewRepository(nil)` is called with a nil `*gorm.DB` in the quality scoring service, which will panic at runtime when the endpoint is called.
 
 69. **Make scoring weights configurable per methodology type** — Quality score weights (registry authority, data quality, etc.) are hardcoded numbers that ignore the specific methodology registered for the project.
 
@@ -184,8 +174,6 @@
 
 87. **Add database index on financing payments by project** — Payment queries filtered by `project_id` have no index, causing slow queries as the payments table grows.
 
-88. **Enable foreign key constraints in GORM auto-migrate** — GORM's `AutoMigrate` does not create FK constraints, so referential integrity violations can silently corrupt relational data.
-
 89. **Add composite index on compliance records for soft-delete filtering** — Soft-deleted compliance records are included in query results unless manually filtered, and there is no index supporting the `deleted_at IS NULL` predicate efficiently.
 
 ---
@@ -224,8 +212,6 @@
 ### 🟡 Observability & Production Readiness
 
 105. **Replace `log.Printf` with a structured leveled logger** — All logging across every module uses the stdlib `log` package without levels, making it impossible to filter noise in production.
-
-106. **Instrument HTTP handlers with OpenTelemetry tracing spans** — The OTel SDK packages are listed in `go.mod` but no spans are created in any handler, leaving distributed traces empty.
 
 107. **Export business KPI metrics via OpenTelemetry** — No custom counters or histograms track credits minted, payments processed, or users registered for operational monitoring.
 
@@ -276,8 +262,6 @@
 126. **Implement IPFS uploader in the legacy `document` package** — `internal/document/ipfs_uploader.go` is future-gated and the `document` package (separate from `documents`) has no working implementation.
 
 127. **Implement PDF generator in the legacy `document` package** — `internal/document/pdf_generator.go` is future-gated; the `documents` package falls back to `ExportPDFPlaceholder` which returns a literal string.
-
-128. **Remove duplicate `document` vs `documents` package ambiguity** — Two separate packages (`internal/document` and `internal/documents`) exist for similar functionality, creating confusion and maintenance overhead.
 
 ---
 
@@ -363,8 +347,6 @@
 9. **Create developer project verification page** — `/developer/projects/[id]/verification/` directory exists with no `page.tsx`, blocking the verification workflow.
 
 
-13. **Create carbon credit marketplace page** — The sidebar links reference a marketplace but no route, layout, or page component exists for it.
-
 14. **Create Stellar transaction history page** — There is no page for viewing on-chain retirement and transfer history despite the backend `/api/v1/stellar` endpoints being available.
 
 
@@ -373,8 +355,6 @@
 ---
 
 ### 🔴 Stellar / Blockchain UI Wiring
-
-17. **Wire `carbonTokens.ts` to TokenizationWizard complete step** — After minting, the wizard does not call any frontend Stellar function to confirm the transaction on-chain before marking the step complete.
 
 
 20. **Add Stellar address format validation to wallet fields** — Any text is accepted in wallet address inputs without validating that it is a valid Stellar public key (`G...` format, 56 characters).
@@ -401,8 +381,6 @@
 34. **Deduplicate concurrent identical API requests** — Multiple components mounting simultaneously issue the same API call without deduplication, creating redundant network traffic.
 
 36. **Validate that API base URL uses HTTPS in production builds** — No check prevents the `NEXT_PUBLIC_API_URL` from being an insecure `http://` URL in a production deployment.
-
-37. **Add retry logic with backoff for network failures** — Transient network errors result in immediate failures with no automatic retry mechanism in the API client layer.
 
 ---
 
@@ -450,8 +428,6 @@
 60. **Connect `NodeDetailPanel` to selected node from dependency graph** — The panel shows generic placeholder text regardless of which graph node the user has selected.
 
 61. **Wire `DailyReportViewer` to reports API** — The viewer renders a date picker with no API call to fetch and display the selected day's monitoring report.
-
-62. **Compute `SLATracker` percentages from live uptime API** — SLA compliance percentages are hardcoded instead of being calculated from the `uptimeStats` object in the health store.
 
 
 64. **Bind `UptimeChart` to historical uptime API data** — The chart is rendered with dummy static data points rather than data from `fetchUptimeApi`.
@@ -529,8 +505,6 @@
 
 93. **Add multi-select and bulk actions to projects list** — No multi-select checkbox or bulk archive/export action exists in the projects list page.
 
-94. **Validate project area against uploaded GeoJSON polygon area** — The hectares input accepts any value without cross-checking against the calculated area of the uploaded boundary geometry.
-
 ---
 
 ### 🟠 Collaboration Components
@@ -589,8 +563,6 @@
 
 117. **Validate post-login redirect URLs to prevent open redirect** — The redirect URL parameter accepted after login is not validated against an allowlist, enabling phishing via crafted redirect URLs.
 
-118. **Replace the ineffective `xss-clean` package** — `xss-clean` is a server-side Express middleware that has no effect in a Next.js/React client-side application and should be removed.
-
 119. **Add CSRF double-submit cookie or `SameSite=Strict` enforcement** — Mutating requests from the frontend do not include a CSRF token; relying on SameSite alone is insufficient for cross-origin form submissions.
 
 
@@ -619,8 +591,6 @@
 129. **Configure `images.remotePatterns` in `next.config.ts`** — No image domain allowlist is set, blocking Next.js `<Image>` from loading any external avatar or thumbnail URLs.
 
 130. **Add environment variable schema validation (Zod) on startup** — The app starts and loads pages even when `NEXT_PUBLIC_API_URL` or other required env vars are undefined.
-
-131. **Enable `reactStrictMode` in `next.config.ts`** — Strict mode is not enabled, hiding React lifecycle correctness bugs that would surface during double-invocation of effects.
 
 132. **Add security response headers to `vercel.json`** — The vercel deployment config has no `headers` block setting `X-Frame-Options`, `X-Content-Type-Options`, or `Referrer-Policy`.
 

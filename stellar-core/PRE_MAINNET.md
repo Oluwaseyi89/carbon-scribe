@@ -22,7 +22,6 @@ Current validation snapshot from this branch:
 ## Carbon Asset (20 issues)
 
 1. Replace generic `InvalidStatusTransition` usage for amount/ledger validation with dedicated SEP-41 input errors.
-3. Add input bounds validation for metadata fields (length and format constraints).
 4. Enforce methodology validation on mint via cross-contract call to `methodology_library`.
 5. Add optional requirement that `methodology_id` must exist before mint completion.
 6. Add mint-time host jurisdiction normalization and canonical code validation.
@@ -34,15 +33,11 @@ Current validation snapshot from this branch:
 15. Add multisig-compatible admin model (role split for mint/config/oracle actions).
 16. Add explicit deprecation path for oracle rotation to avoid single-block trust flips.
 17. Add explicit check that retirement tracker address is contract account at configuration time.
-18. Add integration path for automatic buffer pool deposit during mint (currently only documented).
 19. Add storage TTL extension strategy for long-lived owner/token mappings.
 20. Add formal invariant fuzz tests for SEP-41 amount transfer behavior over token-indexed ownership.
 
 ## Retirement Tracker (20 issues)
 
-22. Add validation for `token_id > 0` and reject invalid IDs with explicit errors.
-
-24. Validate burn call return/error surface from `carbon_asset` and map to `BurnFailed`.
 25. Add explicit cross-contract interface checks during initialization (method existence sanity).
 26. Add duplicate retirement prevention test across `retire` and `batch_retire` interleavings.
 29. Add event for failed retirement attempts to improve auditability.
@@ -59,7 +54,6 @@ Current validation snapshot from this branch:
 
 ## Buffer Pool (20 issues)
 
-41. Require auth on `initialize` caller path and enforce admin/governance signer checks.
 43. Enforce non-zero governance and carbon contract addresses at initialization.
 44. Add validation that deposited token actually exists and is custodied by pool contract.
 45. Add cross-contract transfer-in call to ensure custody is real, not metadata-only.
@@ -81,12 +75,10 @@ Current validation snapshot from this branch:
 
 62. Move critical config keys to instance storage where appropriate for lower rent pressure.
 63. Add metadata schema validation for `name`, `version`, and `registry_link` fields.
-64. Add URI format validation for `registry_link` and CID format validation for `ipfs_cid`.
 66. Add revocation/suspension status field for methodology tokens.
 67. Add explicit historical validity checks rather than current-authority-only evaluation.
 68. Add authority validity windows (start/end timestamps).
 
-70. Add event for admin initialization and authority list bootstrap.
 71. Add event for metadata updates and revocations.
 72. Add bounded authority list size and pagination methods.
 74. Add full approval/transfer edge-case tests for token ownership semantics.
@@ -100,7 +92,6 @@ Current validation snapshot from this branch:
 ## Regulatory Checks (20 issues)
 
 83. Add validation that carbon asset contract address is non-zero and contract account.
-84. Add explicit rule schema validation (non-empty IDs, field length caps, enum consistency).
 
 88. Add support for time-bounded rule activation windows.
 
@@ -118,7 +109,6 @@ Current validation snapshot from this branch:
 ## Tax Attribute (20 issues)
 
 102. Add one-time initialization guard with typed error return.
-103. Require admin auth in initialization flow for explicit ownership acceptance.
 
 106. Add explicit uniqueness strategy for `tag_id` namespace (global vs token-scoped).
 107. Add immutable revocation status flag instead of removing links only.
@@ -139,8 +129,6 @@ Current validation snapshot from this branch:
 
 124. Add one-time initialization guard returning error instead of panic.
 
-126. Add canonical event type registry or namespace validation.
-
 130. Add pruning/archive policy for large entity/type indexes.
 131. Add pagination for `get_events_by_contract` and `get_events_by_type_and_time`.
 132. Add filtered query support (time range, event type prefix, entity prefix).
@@ -156,11 +144,9 @@ Current validation snapshot from this branch:
 ## Registry Contract (20 issues)
 
 141. Add max project count / quota strategy to protect storage growth.
-142. Add project ID format validation and normalization rules.
 144. Add duplicate CID protection per project version history.
 
 146. Add document type allowlist or policy hooks.
-147. Add event for project registration and ownership transfer.
 148. Add event for batch anchor summary in addition to per-document events.
 149. Add pagination endpoint for document history retrieval.
 150. Add pagination endpoint for projects by anchorer retrieval.
@@ -175,8 +161,6 @@ Current validation snapshot from this branch:
 160. Add backup/export script and checksum process for anchored history continuity.
 
 ## Merkle Bridge (20 issues)
-
-162. Require carbon asset contract to be configured before `mint_wrapped` execution.
 
 164. Define and enforce canonical Merkle tree serialization spec shared with relayer.
 166. Add replay protection keyed by `(epoch_id, registry_credit_id)` with explicit invariants.
@@ -204,8 +188,6 @@ Current validation snapshot from this branch:
 187. Add pagination for `get_all_locked` and `get_tokens_locked_until`.
 188. Add reverse index by owner for efficient owner-based lock queries.
 
-190. Add event for admin/config updates (`set_admin`, `set_validate_vintage`).
-191. Add two-step admin transfer with acceptance flow.
 192. Add governance timelock before disabling vintage validation.
 194. Add fallback behavior when vintage oracle call fails (explicit policy).
 195. Add validation for `vintage` contract interface compatibility during configuration.
