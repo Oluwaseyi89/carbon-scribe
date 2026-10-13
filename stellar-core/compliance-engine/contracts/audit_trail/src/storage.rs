@@ -36,4 +36,10 @@ pub enum DataKey {
     TotalEventCount,
     /// Running total of approximate event bytes (instance storage).
     TotalEventBytes,
+    /// Event ID of the most recently recorded event in the global hash chain
+    /// (instance storage; absent before the first event).
+    ChainTip,
+    /// Monotonically increasing nonce used to make each event ID unique
+    /// (instance storage).
+    EventNonce,
 }

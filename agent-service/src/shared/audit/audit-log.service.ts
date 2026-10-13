@@ -19,9 +19,54 @@ export interface AgentAuditEntry {
   agent: AgentName;
   requestId: string;
   requestedBy: string;
+  actor?: string;
+  callingService?: string;
   /** Every tool call the agent made this run, in order. */
-  toolCalls: Array<{ name: string; input: unknown }>;
-  status: "drafted" | "needs-approval" | "failed";
+  toolCalls: Array<{ name: string; input: unknown; output: unknown }>;
+  status:
+    | "drafted"
+    | "needs-approval"
+    | "failed"
+    | "approved"
+    | "rejected"
+    | "dispatch-processed"
+    | "dispatch-retry"
+    | "dispatch-failed";
+}
+
+/**
+ * Maximum byte length for a single tool output before it is truncated in the
+ * audit log. Prevents excessively large marketplace listings or satellite
+ * payloads from growing agent_audit_log unboundedly.
+ *
+ * 8 KiB is large enough to preserve all meaningful evidence for compliance
+ * review (a typical retirement-evidence record or credit listing is well
+ * under 2 KiB) while providing a hard ceiling on any single tool_calls
+ * JSONB entry. Adjust via the AUDIT_TOOL_OUTPUT_MAX_BYTES environment
+ * variable if operational needs change.
+ */
+export const TOOL_OUTPUT_MAX_BYTES =
+  Number(process.env["AUDIT_TOOL_OUTPUT_MAX_BYTES"]) || 8192;
+
+/**
+ * Serialise `output` to a JSON string and, if it exceeds
+ * `TOOL_OUTPUT_MAX_BYTES`, replace the value with a truncation sentinel that
+ * records the original byte length so a reviewer knows data was elided.
+ *
+ * The returned value is a plain JS object (not a string) — it will be
+ * re-serialised together with the rest of the toolCalls array by
+ * `JSON.stringify` in `record()`.
+ */
+export function truncateToolOutput(output: unknown): unknown {
+  const serialised = JSON.stringify(output);
+  if (serialised.length <= TOOL_OUTPUT_MAX_BYTES) {
+    return output;
+  }
+  return {
+    __truncated: true,
+    byteLength: serialised.length,
+    preview: serialised.slice(0, TOOL_OUTPUT_MAX_BYTES),
+  };
 }
 
 // Persistent sink for agent-service's audit trail (issue #578).
@@ -47,17 +92,23 @@ export interface AgentAuditEntry {
 // boundary via each agent route's existing error handler) rather than
 // silently discarding the entry a caller believed was durably recorded.
 export class AuditLogService {
-  constructor(private readonly pool: Queryable = getPool()) {}
+  constructor(private readonly customPool?: Queryable) {}
+
+  private get pool(): Queryable {
+    return this.customPool ?? getPool();
+  }
 
   async record(entry: AgentAuditEntry): Promise<void> {
     await this.pool.query(
       `INSERT INTO agent_audit_log
-         (request_id, agent, requested_by, status, tool_calls, occurred_at)
-       VALUES ($1, $2, $3, $4, $5, $6)`,
+         (request_id, agent, requested_by, actor, calling_service, status, tool_calls, occurred_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
       [
         entry.requestId,
         entry.agent,
         entry.requestedBy,
+        entry.actor ?? null,
+        entry.callingService ?? null,
         entry.status,
         JSON.stringify(entry.toolCalls),
         entry.timestamp,
@@ -76,11 +127,13 @@ export class AuditLogService {
       request_id: string;
       agent: AgentName;
       requested_by: string;
+      actor: string | null;
+      calling_service: string | null;
       status: AgentAuditEntry["status"];
       tool_calls: AgentAuditEntry["toolCalls"];
       occurred_at: Date;
     }>(
-      `SELECT request_id, agent, requested_by, status, tool_calls, occurred_at
+      `SELECT request_id, agent, requested_by, actor, calling_service, status, tool_calls, occurred_at
        FROM agent_audit_log
        WHERE request_id = $1
        ORDER BY occurred_at ASC, id ASC`,
@@ -92,6 +145,8 @@ export class AuditLogService {
       agent: row.agent,
       requestId: row.request_id,
       requestedBy: row.requested_by,
+      ...(row.actor ? { actor: row.actor } : {}),
+      ...(row.calling_service ? { callingService: row.calling_service } : {}),
       toolCalls: row.tool_calls,
       status: row.status,
     }));

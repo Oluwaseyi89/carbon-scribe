@@ -10,7 +10,8 @@ use events::{emit_provenance_validation_failed, emit_pruning_event};
 use storage::DataKey;
 
 use soroban_sdk::{
-    contract, contractimpl, contracttype, Address, Bytes, BytesN, Env, Map, String, Vec,
+    contract, contractimpl, contracttype, Address, Bytes, BytesN, Env, Map, String, TryFromVal,
+    Val, Vec,
 };
 
 /// Maximum allowed event payload size in bytes.
@@ -38,6 +39,42 @@ pub struct AuditEvent {
     pub secondary_entity_id: Option<String>,
     pub event_data: String,
     pub tx_hash: BytesN<32>,
+    /// Per-contract sequence number mixed into the event ID. `None` for
+    /// records written before nonce-based IDs were introduced.
+    pub event_nonce: Option<u64>,
+    /// Event ID of the preceding event in the global audit stream, if any.
+    /// `None` when no prior chain tip exists (the first event in that chain).
+    pub prev_event_hash: Option<BytesN<32>>,
+}
+
+/// The pre-chain event schema, used only to keep already-persisted events
+/// readable when the contract is upgraded.
+#[contracttype(export = false)]
+#[derive(Clone, Debug, PartialEq)]
+struct LegacyAuditEvent {
+    event_id: BytesN<32>,
+    timestamp: u64,
+    event_type: String,
+    emitting_contract: Address,
+    primary_entity_id: String,
+    secondary_entity_id: Option<String>,
+    event_data: String,
+    tx_hash: BytesN<32>,
+}
+
+/// The chain-linked event schema written before event nonces were introduced.
+#[contracttype(export = false)]
+#[derive(Clone, Debug, PartialEq)]
+struct LegacyChainedAuditEvent {
+    event_id: BytesN<32>,
+    timestamp: u64,
+    event_type: String,
+    emitting_contract: Address,
+    primary_entity_id: String,
+    secondary_entity_id: Option<String>,
+    event_data: String,
+    tx_hash: BytesN<32>,
+    prev_event_hash: Option<BytesN<32>>,
 }
 
 #[contract]
@@ -67,6 +104,7 @@ impl AuditTrailContract {
         env.storage()
             .instance()
             .set(&DataKey::TotalEventBytes, &0u64);
+        env.storage().instance().set(&DataKey::EventNonce, &0u64);
 
         let empty_days: Vec<u64> = Vec::new(&env);
         env.storage()
@@ -182,7 +220,8 @@ impl AuditTrailContract {
     ///
     /// # Returns
     ///
-    /// The unique 32-byte event ID derived from `sha256(tx_hash ‖ timestamp)`.
+    /// The unique 32-byte event ID derived from `sha256(tx_hash ‖ timestamp ‖ nonce ‖ prev_event_hash)`,
+    /// omitting `prev_event_hash` for the first event.
     pub fn record_event(
         env: Env,
         caller: Address,
@@ -222,14 +261,32 @@ impl AuditTrailContract {
         }
 
         let timestamp = env.ledger().timestamp();
+        let prev_event_hash: Option<BytesN<32>> = env.storage().instance().get(&DataKey::ChainTip);
+        let event_nonce: u64 = env
+            .storage()
+            .instance()
+            .get(&DataKey::EventNonce)
+            .unwrap_or(0);
+        let next_event_nonce = event_nonce
+            .checked_add(1)
+            .ok_or(AuditTrailError::EventNonceExhausted)?;
 
-        // Derive a deterministic event ID from tx_hash and timestamp.
-        let mut hash_payload = Bytes::new(&env);
-        hash_payload.append(&Bytes::from_slice(&env, &tx_hash.to_array()));
-        hash_payload.append(&Bytes::from_slice(&env, &timestamp.to_be_bytes()));
-        let event_id: BytesN<32> = env.crypto().sha256(&hash_payload).into();
+        // The nonce guarantees a new ID for every successful call, while the
+        // predecessor also binds each event into the global audit chain.
+        let event_id = Self::derive_event_id(
+            &env,
+            &tx_hash,
+            timestamp,
+            event_nonce,
+            prev_event_hash.as_ref(),
+        );
+        let event_key = DataKey::Events(event_id.clone());
+        if env.storage().persistent().has(&event_key) {
+            return Err(AuditTrailError::EventIdCollision);
+        }
 
         let event_size = 32u64
+            + 8
             + 8
             + event_type.len() as u64
             + 32
@@ -239,7 +296,8 @@ impl AuditTrailContract {
                 .map(|s| s.len() as u64)
                 .unwrap_or(0)
             + event_data.len() as u64
-            + 32;
+            + 32
+            + prev_event_hash.as_ref().map(|_| 32u64).unwrap_or(0);
 
         // Build the event — `emitting_contract` is the auth-verified caller,
         // never an unauthenticated parameter.
@@ -252,10 +310,11 @@ impl AuditTrailContract {
             secondary_entity_id: secondary_entity_id.clone(),
             event_data,
             tx_hash,
+            event_nonce: Some(event_nonce),
+            prev_event_hash: prev_event_hash.clone(),
         };
 
         // Persist event.
-        let event_key = DataKey::Events(event_id.clone());
         env.storage().persistent().set(&event_key, &event);
         Self::extend_key_ttl(&env, &event_key, timestamp);
 
@@ -267,9 +326,7 @@ impl AuditTrailContract {
             .get(&entity_key)
             .unwrap_or_else(|| Vec::new(&env));
         entity_events.push_back(event_id.clone());
-        env.storage()
-            .persistent()
-            .set(&entity_key, &entity_events);
+        env.storage().persistent().set(&entity_key, &entity_events);
         Self::extend_key_ttl(&env, &entity_key, timestamp);
 
         // Update type-time index.
@@ -329,9 +386,7 @@ impl AuditTrailContract {
             .get(&day_events_key)
             .unwrap_or_else(|| Vec::new(&env));
         day_events.push_back(event_id.clone());
-        env.storage()
-            .persistent()
-            .set(&day_events_key, &day_events);
+        env.storage().persistent().set(&day_events_key, &day_events);
         Self::extend_key_ttl(&env, &day_events_key, timestamp);
 
         // Update global counters.
@@ -353,6 +408,13 @@ impl AuditTrailContract {
             .instance()
             .set(&DataKey::TotalEventBytes, &(total_bytes + event_size));
 
+        // Advance the global chain only after the event and its indexes have
+        // been written. Soroban rolls all writes back if this invocation fails.
+        env.storage()
+            .instance()
+            .set(&DataKey::EventNonce, &next_event_nonce);
+        env.storage().instance().set(&DataKey::ChainTip, &event_id);
+
         Self::extend_instance_ttl(&env);
 
         Ok(event_id)
@@ -364,16 +426,70 @@ impl AuditTrailContract {
 
     pub fn get_event(env: Env, event_id: BytesN<32>) -> Option<AuditEvent> {
         let key = DataKey::Events(event_id.clone());
-        if let Some(event) = env
-            .storage()
-            .persistent()
-            .get::<DataKey, AuditEvent>(&key)
-        {
+        if let Some(event) = Self::get_event_from_storage(&env, &event_id) {
             Self::extend_key_ttl(&env, &key, event.timestamp);
             Some(event)
         } else {
             None
         }
+    }
+
+    /// Return the event ID of the most recently recorded event, if any.
+    pub fn get_chain_tip(env: Env) -> Option<BytesN<32>> {
+        env.storage().instance().get(&DataKey::ChainTip)
+    }
+
+    /// Verify that the supplied events exist and form a valid ordered chain
+    /// segment.
+    ///
+    /// The first event is the segment's anchor: its predecessor may be outside
+    /// the supplied list. Every subsequent event must point to the prior
+    /// supplied event, and each event ID is recomputed from its transaction
+    /// hash, timestamp, stored nonce (for new events), and predecessor hash.
+    /// To verify from the start of the chain, include the first (unlinked)
+    /// event in the list. A missing event, skipped link, reordered ID, or
+    /// inconsistent event hash returns `false`.
+    pub fn verify_chain_segment(env: Env, event_ids: Vec<BytesN<32>>) -> bool {
+        let mut previous_event_id: Option<BytesN<32>> = None;
+
+        for event_id in event_ids.iter() {
+            let Some(event) = Self::get_event_from_storage(&env, &event_id) else {
+                return false;
+            };
+
+            if event.event_id != event_id {
+                return false;
+            }
+
+            if let Some(previous_id) = previous_event_id.as_ref() {
+                if event.prev_event_hash.as_ref() != Some(previous_id) {
+                    return false;
+                }
+            }
+
+            let expected_event_id = match event.event_nonce {
+                Some(nonce) => Self::derive_event_id(
+                    &env,
+                    &event.tx_hash,
+                    event.timestamp,
+                    nonce,
+                    event.prev_event_hash.as_ref(),
+                ),
+                None => Self::derive_legacy_event_id(
+                    &env,
+                    &event.tx_hash,
+                    event.timestamp,
+                    event.prev_event_hash.as_ref(),
+                ),
+            };
+            if expected_event_id != event_id {
+                return false;
+            }
+
+            previous_event_id = Some(event_id);
+        }
+
+        true
     }
 
     pub fn get_events_by_entity(env: Env, entity_id: String) -> Vec<AuditEvent> {
@@ -385,11 +501,7 @@ impl AuditTrailContract {
             .unwrap_or_else(|| Vec::new(&env));
         let mut events = Vec::new(&env);
         for id in event_ids.iter() {
-            if let Some(e) = env
-                .storage()
-                .persistent()
-                .get::<DataKey, AuditEvent>(&DataKey::Events(id.clone()))
-            {
+            if let Some(e) = Self::get_event_from_storage(&env, &id) {
                 Self::extend_key_ttl(&env, &DataKey::Events(id.clone()), e.timestamp);
                 Self::extend_key_ttl(&env, &entity_key, e.timestamp);
                 events.push_back(e);
@@ -421,11 +533,7 @@ impl AuditTrailContract {
 
         for i in start..end {
             let id = event_ids.get(i).unwrap();
-            if let Some(e) = env
-                .storage()
-                .persistent()
-                .get::<DataKey, AuditEvent>(&DataKey::Events(id.clone()))
-            {
+            if let Some(e) = Self::get_event_from_storage(&env, &id) {
                 Self::extend_key_ttl(&env, &DataKey::Events(id.clone()), e.timestamp);
                 Self::extend_key_ttl(&env, &entity_key, e.timestamp);
                 events.push_back(e);
@@ -448,11 +556,7 @@ impl AuditTrailContract {
             .unwrap_or_else(|| Vec::new(&env));
         let mut events = Vec::new(&env);
         for id in event_ids.iter() {
-            if let Some(e) = env
-                .storage()
-                .persistent()
-                .get::<DataKey, AuditEvent>(&DataKey::Events(id.clone()))
-            {
+            if let Some(e) = Self::get_event_from_storage(&env, &id) {
                 Self::extend_key_ttl(&env, &DataKey::Events(id.clone()), e.timestamp);
                 Self::extend_key_ttl(&env, &type_time_key, e.timestamp);
                 events.push_back(e);
@@ -470,11 +574,7 @@ impl AuditTrailContract {
             .unwrap_or_else(|| Vec::new(&env));
         let mut events = Vec::new(&env);
         for id in event_ids.iter() {
-            if let Some(e) = env
-                .storage()
-                .persistent()
-                .get::<DataKey, AuditEvent>(&DataKey::Events(id.clone()))
-            {
+            if let Some(e) = Self::get_event_from_storage(&env, &id) {
                 Self::extend_key_ttl(&env, &DataKey::Events(id.clone()), e.timestamp);
                 Self::extend_key_ttl(&env, &contract_key, e.timestamp);
                 events.push_back(e);
@@ -507,8 +607,14 @@ impl AuditTrailContract {
 
     /// Prune events that have exceeded the retention period.
     ///
-    /// Only the admin may call this function.  Emits a [`PruningEvent`] if any
-    /// events are removed.
+    /// Only the admin may call this function. Emits a [`PruningEvent`] if any
+    /// events are removed. Pruning does not rewind, repair, or recompute the
+    /// global chain tip: later events continue to reference their original
+    /// predecessor. A verification request spanning a pruned event will fail
+    /// because that event is no longer available; a segment beginning after
+    /// pruning can verify only its internal links, not its connection to the
+    /// pruned history. This loss of historical verifiability is an intentional
+    /// retention tradeoff.
     pub fn prune_old_events(env: Env) -> Result<u32, AuditTrailError> {
         let admin: Address = env
             .storage()
@@ -539,14 +645,9 @@ impl AuditTrailContract {
                     .get::<DataKey, Vec<BytesN<32>>>(&day_events_key)
                 {
                     for event_id in event_ids.iter() {
-                        if let Some(event) = env
-                            .storage()
-                            .persistent()
-                            .get::<DataKey, AuditEvent>(&DataKey::Events(event_id.clone()))
-                        {
+                        if let Some(event) = Self::get_event_from_storage(&env, &event_id) {
                             // Remove from entity index.
-                            let entity_key =
-                                DataKey::EntityIndex(event.primary_entity_id.clone());
+                            let entity_key = DataKey::EntityIndex(event.primary_entity_id.clone());
                             if let Some(mut entity_events) = env
                                 .storage()
                                 .persistent()
@@ -557,18 +658,14 @@ impl AuditTrailContract {
                                     if entity_events.is_empty() {
                                         env.storage().persistent().remove(&entity_key);
                                     } else {
-                                        env.storage()
-                                            .persistent()
-                                            .set(&entity_key, &entity_events);
+                                        env.storage().persistent().set(&entity_key, &entity_events);
                                     }
                                 }
                             }
 
                             // Remove from type-time index.
-                            let type_time_key = DataKey::TypeTimeIndex((
-                                event.event_type.clone(),
-                                day,
-                            ));
+                            let type_time_key =
+                                DataKey::TypeTimeIndex((event.event_type.clone(), day));
                             if let Some(mut type_time_events) = env
                                 .storage()
                                 .persistent()
@@ -587,9 +684,8 @@ impl AuditTrailContract {
                             }
 
                             // Remove from contract (caller) index.
-                            let contract_key = DataKey::ContractIndex(
-                                event.emitting_contract.clone(),
-                            );
+                            let contract_key =
+                                DataKey::ContractIndex(event.emitting_contract.clone());
                             if let Some(mut contract_events) = env
                                 .storage()
                                 .persistent()
@@ -609,6 +705,7 @@ impl AuditTrailContract {
 
                             let event_size = 32u64
                                 + 8
+                                + event.event_nonce.map(|_| 8u64).unwrap_or(0)
                                 + event.event_type.len() as u64
                                 + 32
                                 + event.primary_entity_id.len() as u64
@@ -618,7 +715,8 @@ impl AuditTrailContract {
                                     .map(|s| s.len() as u64)
                                     .unwrap_or(0)
                                 + event.event_data.len() as u64
-                                + 32;
+                                + 32
+                                + event.prev_event_hash.as_ref().map(|_| 32u64).unwrap_or(0);
 
                             pruned_bytes += event_size;
                             pruned_count += 1;
@@ -689,6 +787,86 @@ impl AuditTrailContract {
     // -------------------------------------------------------------------------
     // Private helpers
     // -------------------------------------------------------------------------
+
+    fn derive_event_id(
+        env: &Env,
+        tx_hash: &BytesN<32>,
+        timestamp: u64,
+        event_nonce: u64,
+        prev_event_hash: Option<&BytesN<32>>,
+    ) -> BytesN<32> {
+        let mut hash_payload = Bytes::new(env);
+        hash_payload.append(&Bytes::from_slice(env, &tx_hash.to_array()));
+        hash_payload.append(&Bytes::from_slice(env, &timestamp.to_be_bytes()));
+        hash_payload.append(&Bytes::from_slice(env, &event_nonce.to_be_bytes()));
+        if let Some(previous_hash) = prev_event_hash {
+            hash_payload.append(&Bytes::from_slice(env, &previous_hash.to_array()));
+        }
+        env.crypto().sha256(&hash_payload).into()
+    }
+
+    fn derive_legacy_event_id(
+        env: &Env,
+        tx_hash: &BytesN<32>,
+        timestamp: u64,
+        prev_event_hash: Option<&BytesN<32>>,
+    ) -> BytesN<32> {
+        let mut hash_payload = Bytes::new(env);
+        hash_payload.append(&Bytes::from_slice(env, &tx_hash.to_array()));
+        hash_payload.append(&Bytes::from_slice(env, &timestamp.to_be_bytes()));
+        if let Some(previous_hash) = prev_event_hash {
+            hash_payload.append(&Bytes::from_slice(env, &previous_hash.to_array()));
+        }
+        env.crypto().sha256(&hash_payload).into()
+    }
+
+    /// Read either the current event schema or the legacy pre-chain schema.
+    /// Older records did not contain `prev_event_hash`; expose them with a
+    /// `None` predecessor without rewriting their stored representation.
+    fn get_event_from_storage(env: &Env, event_id: &BytesN<32>) -> Option<AuditEvent> {
+        let key = DataKey::Events(event_id.clone());
+        let stored: Val = env.storage().persistent().get(&key)?;
+        let stored_map: Map<soroban_sdk::Symbol, Val> = Map::try_from_val(env, &stored).ok()?;
+
+        // Struct maps require an exact key count to decode. Select the schema
+        // before invoking the generated decoder, which otherwise traps on a
+        // legacy map that lacks the newly added field.
+        if stored_map.len() == 10 {
+            return AuditEvent::try_from_val(env, &stored).ok();
+        }
+        if stored_map.len() == 9 {
+            let chained = LegacyChainedAuditEvent::try_from_val(env, &stored).ok()?;
+            return Some(AuditEvent {
+                event_id: chained.event_id,
+                timestamp: chained.timestamp,
+                event_type: chained.event_type,
+                emitting_contract: chained.emitting_contract,
+                primary_entity_id: chained.primary_entity_id,
+                secondary_entity_id: chained.secondary_entity_id,
+                event_data: chained.event_data,
+                tx_hash: chained.tx_hash,
+                event_nonce: None,
+                prev_event_hash: chained.prev_event_hash,
+            });
+        }
+        if stored_map.len() != 8 {
+            return None;
+        }
+
+        let legacy = LegacyAuditEvent::try_from_val(env, &stored).ok()?;
+        Some(AuditEvent {
+            event_id: legacy.event_id,
+            timestamp: legacy.timestamp,
+            event_type: legacy.event_type,
+            emitting_contract: legacy.emitting_contract,
+            primary_entity_id: legacy.primary_entity_id,
+            secondary_entity_id: legacy.secondary_entity_id,
+            event_data: legacy.event_data,
+            tx_hash: legacy.tx_hash,
+            event_nonce: None,
+            prev_event_hash: None,
+        })
+    }
 
     fn get_retention_period_internal(env: &Env) -> u64 {
         env.storage()

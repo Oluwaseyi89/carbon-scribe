@@ -4,6 +4,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const auditRecord = vi.fn().mockResolvedValue(undefined);
 vi.mock("../../shared/audit/audit-log.service.js", () => ({
   auditLog: { record: (...args: unknown[]) => auditRecord(...args) },
+  // Pass output through unchanged in tests — truncation is covered by
+  // audit-log.service.test.ts, not by agent-level tests.
+  truncateToolOutput: (output: unknown) => output,
 }));
 
 const toolRunnerMock = vi.fn();
@@ -96,6 +99,16 @@ describe("runDiscoveryAgent", () => {
         },
       ],
     };
+    const toolResultMessage = {
+      role: "user",
+      content: [
+        {
+          type: "tool_result",
+          tool_use_id: "call_1",
+          content: [{ id: "credit-1", methodology: "REDD+", price: 15 }],
+        },
+      ],
+    };
 
     toolRunnerMock.mockReturnValue(
       fakeRunner({
@@ -103,7 +116,11 @@ describe("runDiscoveryAgent", () => {
           stop_reason: "end_turn",
           content: [{ type: "text", text: JSON.stringify(output) }],
         },
-        messages: [{ role: "user", content: "..." }, assistantToolUseMessage],
+        messages: [
+          { role: "user", content: "..." },
+          assistantToolUseMessage,
+          toolResultMessage,
+        ],
       }),
     );
 
@@ -128,7 +145,53 @@ describe("runDiscoveryAgent", () => {
           {
             name: "search_marketplace_credits",
             input: { methodology: "REDD+" },
+            output: [{ id: "credit-1", methodology: "REDD+", price: 15 }],
           },
+        ],
+      }),
+    );
+  });
+
+  it("records output: null for a tool call whose result was not captured (e.g. runner aborted before tool_result)", async () => {
+    const output = {
+      recommendations: [],
+      citations: [],
+    };
+    const assistantToolUseMessage = {
+      role: "assistant",
+      content: [
+        {
+          type: "tool_use",
+          id: "call_no_result",
+          name: "search_marketplace_credits",
+          input: { methodology: "VCS" },
+        },
+      ],
+    };
+    // No matching tool_result user message.
+    toolRunnerMock.mockReturnValue(
+      fakeRunner({
+        finalMessage: {
+          stop_reason: "end_turn",
+          content: [{ type: "text", text: JSON.stringify(output) }],
+        },
+        messages: [{ role: "user", content: "..." }, assistantToolUseMessage],
+      }),
+    );
+
+    await runDiscoveryAgent({
+      requestId: "req-no-result",
+      requestedBy: "user-1",
+      input: {},
+    });
+
+    expect(auditRecord).toHaveBeenCalledWith(
+      expect.objectContaining({
+        toolCalls: [
+          expect.objectContaining({
+            name: "search_marketplace_credits",
+            output: null,
+          }),
         ],
       }),
     );
@@ -150,15 +213,38 @@ describe("runDiscoveryAgent", () => {
     });
 
     expect(result.status).toBe("failed");
-    expect((result.output as { error: string }).error).toContain(
-      "Anthropic API error",
-    );
+    expect((result.output as { error: string }).error).toContain("API error");
+    expect(result.errorCategory).toBe("connection_error");
+    expect(result.retryable).toBe(true);
     expect(auditRecord).toHaveBeenCalledWith(
       expect.objectContaining({
         agent: "discovery",
         requestId: "req-2",
         status: "failed",
       }),
+    );
+  });
+
+  it("classifies rate limit errors as retryable", async () => {
+    const rateLimitError = new Anthropic.RateLimitError(
+      429,
+      { message: "rate limit exceeded" },
+      "rate limit exceeded",
+      new Headers(),
+    );
+    toolRunnerMock.mockReturnValue(fakeRunner({ error: rateLimitError }));
+
+    const result = await runDiscoveryAgent({
+      requestId: "req-6",
+      requestedBy: "user-1",
+      input: {},
+    });
+
+    expect(result.status).toBe("failed");
+    expect(result.errorCategory).toBe("rate_limited");
+    expect(result.retryable).toBe(true);
+    expect((result.output as { error: string }).error).toContain(
+      "Rate limit exceeded",
     );
   });
 

@@ -1,17 +1,134 @@
 package auth
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"log"
 	"net/mail"
+	"strings"
+	"sync"
 	"time"
 
+	"carbon-scribe/project-portal/project-portal-backend/pkg/aws"
 	"carbon-scribe/project-portal/project-portal-backend/pkg/utils"
 
 	"github.com/google/uuid"
 )
+
+const (
+	// DefaultPasswordHashCost defines the default bcrypt cost factor used when hashing passwords.
+	DefaultPasswordHashCost = 12
+
+	// EmailVerificationTokenTTL defines the lifespan of an email verification token.
+	EmailVerificationTokenTTL = 24 * time.Hour
+
+	// PasswordResetTokenTTL defines the lifespan of a password reset token.
+	PasswordResetTokenTTL = 1 * time.Hour
+
+	// DefaultMaxLoginAttempts defines default failed attempt threshold before locking account.
+	DefaultMaxLoginAttempts = 5
+
+	// DefaultLockoutDuration defines default account lockout duration.
+	DefaultLockoutDuration = 15 * time.Minute
+)
+
+var ErrAccountLocked = errors.New("account is locked due to repeated failed login attempts")
+var ErrUserNotFound = errors.New("user not found")
+
+// AccountLockedError represents an account lockout error with expiration detail.
+type AccountLockedError struct {
+	LockedUntil *time.Time
+}
+
+func (e *AccountLockedError) Error() string {
+	return ErrAccountLocked.Error()
+}
+
+func (e *AccountLockedError) Is(target error) bool {
+	return target == ErrAccountLocked || target == e
+}
+
+type ipRecord struct {
+	attempts    int
+	lockedUntil time.Time
+	lastAttempt time.Time
+}
+
+type IPAttemptTracker struct {
+	mu      sync.RWMutex
+	records map[string]*ipRecord
+}
+
+func newIPAttemptTracker() *IPAttemptTracker {
+	return &IPAttemptTracker{
+		records: make(map[string]*ipRecord),
+	}
+}
+
+func (t *IPAttemptTracker) IsLocked(ip string) bool {
+	if ip == "" {
+		return false
+	}
+	t.mu.RLock()
+	rec, exists := t.records[ip]
+	lockedUntil := time.Time{}
+	if exists {
+		lockedUntil = rec.lockedUntil
+	}
+	t.mu.RUnlock()
+	return exists && time.Now().Before(lockedUntil)
+}
+
+func (t *IPAttemptTracker) LockoutUntil(ip string) *time.Time {
+	if ip == "" {
+		return nil
+	}
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+	rec, exists := t.records[ip]
+	if !exists || !time.Now().Before(rec.lockedUntil) {
+		return nil
+	}
+	lockedUntil := rec.lockedUntil
+	return &lockedUntil
+}
+
+func (t *IPAttemptTracker) RecordFailure(ip string, maxAttempts int, duration time.Duration) {
+	if ip == "" {
+		return
+	}
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	now := time.Now()
+	for address, existing := range t.records {
+		if !now.Before(existing.lockedUntil) && now.Sub(existing.lastAttempt) >= duration {
+			delete(t.records, address)
+		}
+	}
+	rec, exists := t.records[ip]
+	if !exists || (!rec.lockedUntil.IsZero() && !now.Before(rec.lockedUntil)) {
+		rec = &ipRecord{attempts: 0}
+		t.records[ip] = rec
+	}
+	rec.attempts++
+	rec.lastAttempt = now
+	if rec.attempts >= maxAttempts {
+		rec.lockedUntil = now.Add(duration)
+		log.Printf("[AUDIT] IP address locked due to repeated failure attempts: ip=%s attempts=%d locked_until=%v", ip, rec.attempts, rec.lockedUntil)
+	}
+}
+
+func (t *IPAttemptTracker) Reset(ip string) {
+	if ip == "" {
+		return
+	}
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	delete(t.records, ip)
+}
 
 // Service handles business logic for authentication
 type Service struct {
@@ -19,19 +136,64 @@ type Service struct {
 	tokenManager     *TokenManager
 	stellarAuth      *StellarAuthenticator
 	passwordHashCost int
+	maxLoginAttempts int
+	lockoutDuration  time.Duration
+	ipTracker        *IPAttemptTracker
+
+	// emailer is optional: when nil, verification/reset tokens are still
+	// generated and stored but no email is sent (matching this service's
+	// pre-email-delivery behavior). Set via WithEmailer.
+	emailer              aws.EmailClient
+	verificationBaseURL  string
+	passwordResetBaseURL string
+}
+
+// ServiceOption configures optional Service dependencies.
+type ServiceOption func(*Service)
+
+// WithLockoutConfig configures custom lockout thresholds and duration.
+func WithLockoutConfig(maxAttempts int, duration time.Duration) ServiceOption {
+	return func(s *Service) {
+		if maxAttempts > 0 {
+			s.maxLoginAttempts = maxAttempts
+		}
+		if duration > 0 {
+			s.lockoutDuration = duration
+		}
+	}
+}
+
+// WithEmailer wires a transactional email client into the service so
+// registration and password-reset flows actually deliver their tokens by
+// email instead of only generating them. verificationBaseURL and
+// passwordResetBaseURL are the frontend URLs the token is appended to as a
+// "?token=" query parameter (see internal/config's AuthConfig).
+func WithEmailer(emailer aws.EmailClient, verificationBaseURL, passwordResetBaseURL string) ServiceOption {
+	return func(s *Service) {
+		s.emailer = emailer
+		s.verificationBaseURL = verificationBaseURL
+		s.passwordResetBaseURL = passwordResetBaseURL
+	}
 }
 
 // NewService creates a new auth service
-func NewService(repo *Repository, tm *TokenManager, sa *StellarAuthenticator, hashCost int) *Service {
+func NewService(repo *Repository, tm *TokenManager, sa *StellarAuthenticator, hashCost int, opts ...ServiceOption) *Service {
 	if hashCost == 0 {
-		hashCost = 12
+		hashCost = DefaultPasswordHashCost
 	}
-	return &Service{
+	s := &Service{
 		repository:       repo,
 		tokenManager:     tm,
 		stellarAuth:      sa,
 		passwordHashCost: hashCost,
+		maxLoginAttempts: DefaultMaxLoginAttempts,
+		lockoutDuration:  DefaultLockoutDuration,
+		ipTracker:        newIPAttemptTracker(),
 	}
+	for _, opt := range opts {
+		opt(s)
+	}
+	return s
 }
 
 // Register registers a new user
@@ -75,16 +237,23 @@ func (s *Service) Register(email, password, fullName, organization string) (*Use
 	}
 
 	// Generate email verification token
-	verificationToken, err := s.generateAuthToken(user.ID, "email_verification", 24*time.Hour)
+	verificationToken, err := s.generateAuthToken(user.ID, "email_verification", EmailVerificationTokenTTL)
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to generate verification token: %w", err)
 	}
+
+	s.sendVerificationEmail(user.Email, verificationToken)
 
 	return toUserResponse(user), verificationToken, nil
 }
 
 // Login authenticates a user with email and password
 func (s *Service) Login(email, password string, ipAddress, userAgent string) (*AuthResponse, error) {
+	if s.ipTracker != nil && s.ipTracker.IsLocked(ipAddress) {
+		log.Printf("[AUDIT] Blocked login attempt from locked IP address: ip=%s email=%s user_agent=%s", ipAddress, email, userAgent)
+		return nil, &AccountLockedError{LockedUntil: s.ipTracker.LockoutUntil(ipAddress)}
+	}
+
 	// Get user by email
 	user, err := s.repository.GetUserByEmail(email)
 	if err != nil {
@@ -92,11 +261,46 @@ func (s *Service) Login(email, password string, ipAddress, userAgent string) (*A
 	}
 
 	if user == nil {
+		if s.ipTracker != nil {
+			s.ipTracker.RecordFailure(ipAddress, s.maxLoginAttempts, s.lockoutDuration)
+		}
+		log.Printf("[AUDIT] Failed login attempt (user not found): email=%s ip=%s user_agent=%s", email, ipAddress, userAgent)
 		return nil, errors.New("invalid email or password")
+	}
+
+	// Check if account is locked BEFORE password verification
+	if user.LockedUntil != nil {
+		if user.LockedUntil.After(time.Now()) {
+			log.Printf("[AUDIT] Blocked login attempt for locked user account: email=%s ip=%s user_agent=%s locked_until=%v", email, ipAddress, userAgent, user.LockedUntil)
+			return nil, &AccountLockedError{LockedUntil: user.LockedUntil}
+		}
+		// Lockout period expired: automatically clear lockout
+		user.FailedLoginAttempts = 0
+		user.LockedUntil = nil
+		if err := s.repository.ClearUserLockout(user.ID); err != nil {
+			return nil, fmt.Errorf("failed to clear expired lockout: %w", err)
+		}
 	}
 
 	// Verify password
 	if err := utils.VerifyPassword(user.PasswordHash, password); err != nil {
+		if s.ipTracker != nil {
+			s.ipTracker.RecordFailure(ipAddress, s.maxLoginAttempts, s.lockoutDuration)
+		}
+		attempts, lockedUntil, recordErr := s.repository.RecordUserLoginFailure(user.ID, s.maxLoginAttempts, s.lockoutDuration)
+		if recordErr != nil {
+			return nil, fmt.Errorf("failed to record login failure: %w", recordErr)
+		}
+		user.FailedLoginAttempts, user.LockedUntil = attempts, lockedUntil
+		if lockedUntil != nil {
+			log.Printf("[AUDIT] User account locked due to repeated failed password attempts: email=%s ip=%s user_agent=%s attempts=%d locked_until=%v", email, ipAddress, userAgent, attempts, *lockedUntil)
+		} else {
+			log.Printf("[AUDIT] Failed password verification: email=%s ip=%s user_agent=%s attempts=%d", email, ipAddress, userAgent, attempts)
+		}
+
+		if lockedUntil != nil {
+			return nil, &AccountLockedError{LockedUntil: lockedUntil}
+		}
 		return nil, errors.New("invalid email or password")
 	}
 
@@ -108,21 +312,59 @@ func (s *Service) Login(email, password string, ipAddress, userAgent string) (*A
 		return nil, ErrEmailNotVerified
 	}
 
+	if s.ipTracker != nil {
+		s.ipTracker.Reset(ipAddress)
+	}
+
 	// Create session and generate tokens
 	return s.createSessionAndTokens(user, ipAddress, userAgent)
 }
 
 // WalletLogin authenticates a user with Stellar wallet signature
 func (s *Service) WalletLogin(publicKey, signedChallenge string, ipAddress, userAgent string) (*AuthResponse, error) {
-	// Verify the wallet signature
-	if err := s.stellarAuth.VerifyChallengeSignature(publicKey, signedChallenge); err != nil {
-		return nil, fmt.Errorf("wallet signature verification failed: %w", err)
+	if s.ipTracker != nil && s.ipTracker.IsLocked(ipAddress) {
+		log.Printf("[AUDIT] Blocked wallet login attempt from locked IP address: ip=%s wallet=%s user_agent=%s", ipAddress, publicKey, userAgent)
+		return nil, &AccountLockedError{LockedUntil: s.ipTracker.LockoutUntil(ipAddress)}
 	}
 
-	// Find or create user by wallet address
+	// Retrieve user by wallet address first to check lockout status BEFORE verifying challenge signature
 	user, err := s.repository.GetUserByWalletAddress(publicKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve user: %w", err)
+	}
+
+	if user != nil && user.LockedUntil != nil {
+		if user.LockedUntil.After(time.Now()) {
+			log.Printf("[AUDIT] Blocked wallet login attempt for locked user account: wallet=%s ip=%s user_agent=%s locked_until=%v", publicKey, ipAddress, userAgent, user.LockedUntil)
+			return nil, &AccountLockedError{LockedUntil: user.LockedUntil}
+		}
+		// Lockout expired: clear lockout state
+		user.FailedLoginAttempts = 0
+		user.LockedUntil = nil
+		if err := s.repository.ClearUserLockout(user.ID); err != nil {
+			return nil, fmt.Errorf("failed to clear expired lockout: %w", err)
+		}
+	}
+
+	// Verify the wallet signature
+	if err := s.stellarAuth.VerifyChallengeSignature(publicKey, signedChallenge); err != nil {
+		if s.ipTracker != nil {
+			s.ipTracker.RecordFailure(ipAddress, s.maxLoginAttempts, s.lockoutDuration)
+		}
+		if user != nil {
+			attempts, lockedUntil, recordErr := s.repository.RecordUserLoginFailure(user.ID, s.maxLoginAttempts, s.lockoutDuration)
+			if recordErr != nil {
+				return nil, fmt.Errorf("failed to record login failure: %w", recordErr)
+			}
+			user.FailedLoginAttempts, user.LockedUntil = attempts, lockedUntil
+
+			if lockedUntil != nil {
+				log.Printf("[AUDIT] User account locked due to failed wallet signature verification: wallet=%s ip=%s user_agent=%s attempts=%d locked_until=%v", publicKey, ipAddress, userAgent, attempts, *lockedUntil)
+				return nil, &AccountLockedError{LockedUntil: lockedUntil}
+			}
+			log.Printf("[AUDIT] Failed wallet signature verification: wallet=%s ip=%s user_agent=%s attempts=%d", publicKey, ipAddress, userAgent, attempts)
+		}
+		return nil, fmt.Errorf("wallet signature verification failed: %w", err)
 	}
 
 	// If user doesn't exist, create a new one (wallet-only user)
@@ -150,6 +392,10 @@ func (s *Service) WalletLogin(publicKey, signedChallenge string, ipAddress, user
 		return nil, ErrEmailNotVerified
 	}
 
+	if s.ipTracker != nil {
+		s.ipTracker.Reset(ipAddress)
+	}
+
 	return s.createSessionAndTokens(user, ipAddress, userAgent)
 }
 
@@ -174,7 +420,7 @@ func (s *Service) RefreshToken(refreshToken string) (*TokenResponse, error) {
 	}
 
 	if user == nil {
-		return nil, errors.New("user not found")
+		return nil, ErrUserNotFound
 	}
 	if !user.IsActive {
 		return nil, errors.New("user account is disabled")
@@ -254,10 +500,12 @@ func (s *Service) RequestPasswordReset(email string) (string, error) {
 	}
 
 	// Generate reset token
-	resetToken, err := s.generateAuthToken(user.ID, "password_reset", 1*time.Hour)
+	resetToken, err := s.generateAuthToken(user.ID, "password_reset", PasswordResetTokenTTL)
 	if err != nil {
 		return "", fmt.Errorf("failed to generate reset token: %w", err)
 	}
+
+	s.sendPasswordResetEmail(user.Email, resetToken)
 
 	return resetToken, nil
 }
@@ -377,7 +625,14 @@ func (s *Service) ResendVerification(email string) (string, error) {
 		return "", nil
 	}
 
-	return s.generateAuthToken(user.ID, "email_verification", 24*time.Hour)
+	token, err := s.generateAuthToken(user.ID, "email_verification", EmailVerificationTokenTTL)
+	if err != nil {
+		return "", err
+	}
+
+	s.sendVerificationEmail(user.Email, token)
+
+	return token, nil
 }
 
 // GetUserProfile retrieves a user's profile
@@ -472,6 +727,15 @@ func (s *Service) createSessionAndTokens(user *User, ipAddress, userAgent string
 		return nil, fmt.Errorf("failed to create session: %w", err)
 	}
 
+	// Reset lockout counter and clear lockout timestamp on successful login
+	if user.FailedLoginAttempts > 0 || user.LockedUntil != nil {
+		user.FailedLoginAttempts = 0
+		user.LockedUntil = nil
+		if err := s.repository.ClearUserLockout(user.ID); err != nil {
+			log.Printf("auth: failed to clear lockout state on login success: %v", err)
+		}
+	}
+
 	// Update last login
 	if err := s.repository.UpdateUserLastLogin(user.ID); err != nil {
 		return nil, fmt.Errorf("failed to update last login: %w", err)
@@ -485,9 +749,30 @@ func (s *Service) createSessionAndTokens(user *User, ipAddress, userAgent string
 	}, nil
 }
 
+// ClearLockout manually clears a user's account lockout state (e.g. by admin or support)
+func (s *Service) ClearLockout(targetUserID string) error {
+	user, err := s.repository.GetUserByID(targetUserID)
+	if err != nil {
+		return fmt.Errorf("failed to retrieve user: %w", err)
+	}
+	if user == nil {
+		return ErrUserNotFound
+	}
+
+	user.FailedLoginAttempts = 0
+	user.LockedUntil = nil
+
+	if err := s.repository.ClearUserLockout(targetUserID); err != nil {
+		return fmt.Errorf("failed to clear user lockout: %w", err)
+	}
+
+	log.Printf("[AUDIT] User account manually unlocked: user_id=%s email=%s", user.ID, user.Email)
+	return nil
+}
+
 func (s *Service) generateAuthToken(userID, tokenType string, expiry time.Duration) (string, error) {
 	if expiry == 0 {
-		expiry = 24 * time.Hour
+		expiry = EmailVerificationTokenTTL
 	}
 
 	// Generate random token
@@ -514,6 +799,50 @@ func (s *Service) generateAuthToken(userID, tokenType string, expiry time.Durati
 	}
 
 	return tokenStr, nil
+}
+
+// sendVerificationEmail emails a freshly generated verification token, if
+// an emailer is configured. A send failure is logged, not returned: the
+// token is already stored and valid, so a transient SES hiccup shouldn't
+// fail registration/resend — the caller can request another resend.
+func (s *Service) sendVerificationEmail(toEmail, token string) {
+	link := buildTokenLink(s.verificationBaseURL, token)
+	if s.emailer == nil {
+		// No SES client configured (e.g. local dev without SES_FROM_ADDRESS
+		// set): log the link instead of silently discarding it. Never
+		// returned over HTTP — see internal/auth/handler.go.
+		log.Printf("auth: no emailer configured; verification link for %s: %s", toEmail, link)
+		return
+	}
+	subject, htmlBody, textBody := aws.RenderVerificationEmail(link, EmailVerificationTokenTTL)
+	if err := s.emailer.SendEmail(context.Background(), toEmail, subject, htmlBody, textBody); err != nil {
+		log.Printf("auth: failed to send verification email to %s: %v", toEmail, err)
+	}
+}
+
+// sendPasswordResetEmail emails a freshly generated password-reset token,
+// if an emailer is configured. Like sendVerificationEmail, a send failure
+// is logged rather than propagated.
+func (s *Service) sendPasswordResetEmail(toEmail, token string) {
+	link := buildTokenLink(s.passwordResetBaseURL, token)
+	if s.emailer == nil {
+		log.Printf("auth: no emailer configured; password reset link for %s: %s", toEmail, link)
+		return
+	}
+	subject, htmlBody, textBody := aws.RenderPasswordResetEmail(link, PasswordResetTokenTTL)
+	if err := s.emailer.SendEmail(context.Background(), toEmail, subject, htmlBody, textBody); err != nil {
+		log.Printf("auth: failed to send password reset email to %s: %v", toEmail, err)
+	}
+}
+
+// buildTokenLink appends a "token" query parameter to baseURL, handling
+// baseURL both with and without a pre-existing query string.
+func buildTokenLink(baseURL, token string) string {
+	separator := "?"
+	if strings.Contains(baseURL, "?") {
+		separator = "&"
+	}
+	return fmt.Sprintf("%s%stoken=%s", baseURL, separator, token)
 }
 
 func (s *Service) getUserPermissions(role string) ([]string, error) {

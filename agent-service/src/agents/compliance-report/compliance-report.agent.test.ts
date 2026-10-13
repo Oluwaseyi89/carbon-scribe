@@ -4,6 +4,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const auditRecord = vi.fn().mockResolvedValue(undefined);
 vi.mock("../../shared/audit/audit-log.service.js", () => ({
   auditLog: { record: (...args: unknown[]) => auditRecord(...args) },
+  // Pass output through unchanged in tests — truncation is covered by
+  // audit-log.service.test.ts, not by agent-level tests.
+  truncateToolOutput: (output: unknown) => output,
 }));
 
 const toolRunnerMock = vi.fn();
@@ -176,6 +179,7 @@ describe("runComplianceReportAgent", () => {
               periodStart: "2026-01-01",
               periodEnd: "2026-06-30",
             },
+            output: null,
           },
         ],
       }),
@@ -198,15 +202,38 @@ describe("runComplianceReportAgent", () => {
     });
 
     expect(result.status).toBe("failed");
-    expect((result.output as { error: string }).error).toContain(
-      "Anthropic API error",
-    );
+    expect((result.output as { error: string }).error).toContain("API error");
+    expect(result.errorCategory).toBe("connection_error");
+    expect(result.retryable).toBe(true);
     expect(auditRecord).toHaveBeenCalledWith(
       expect.objectContaining({
         agent: "compliance-report",
         requestId: "req-2",
         status: "failed",
       }),
+    );
+  });
+
+  it("classifies rate limit errors as retryable", async () => {
+    const rateLimitError = new Anthropic.RateLimitError(
+      429,
+      { message: "rate limit exceeded" },
+      "rate limit exceeded",
+      new Headers(),
+    );
+    toolRunnerMock.mockReturnValue(fakeRunner({ error: rateLimitError }));
+
+    const result = await runComplianceReportAgent({
+      requestId: "req-3",
+      requestedBy: "user-1",
+      input: {},
+    });
+
+    expect(result.status).toBe("failed");
+    expect(result.errorCategory).toBe("rate_limited");
+    expect(result.retryable).toBe(true);
+    expect((result.output as { error: string }).error).toContain(
+      "Rate limit exceeded",
     );
   });
 
